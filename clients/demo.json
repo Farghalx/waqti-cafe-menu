@@ -1,0 +1,27 @@
+{
+  "id": "demo",
+  "name_ar": "مطعم <b>النيل</b>",
+  "currency": "ج",
+  "demo": true,
+  "webhook": "",
+  "theme": { "blue": "#14532D", "blue2": "#1C6B3A", "gold": "#C99700", "gold2": "#E9C45A", "bg": "#F3F0E7" },
+  "_note": "DEMO restaurant — showcases white-label theming + photos. Orders are NOT sent anywhere.",
+  "categories": [
+    {
+      "id": "food",
+      "name_ar": "أكل",
+      "items": [
+        { "id": "koshary", "name_ar": "كشري", "price": 35, "image": "img/sample-koshary.svg" },
+        { "id": "shawarma", "name_ar": "شاورما فراخ", "price": 60, "image": "img/sample-shawarma.svg" }
+      ]
+    },
+    {
+      "id": "drinks",
+      "name_ar": "مشروبات",
+      "items": [
+        { "id": "mango", "name_ar": "عصير مانجو", "price": 30, "image": "img/sample-mango.svg" },
+        { "id": "coffee", "name_ar": "قهوة تركي", "price": 18, "sugar": "style", "image": "img/sample-coffee.svg" }
+      ]
+    }
+  ]
+}
