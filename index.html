@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>قائمة الطلبات</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --blue: #0E2856;   /* Waqti royal blue — trust */
+      --gold: #C08C23;   /* antique gold — premium */
+      --ink:  #111111;   /* charcoal */
+      --bg:   #F5F2EC;   /* warm light bg, easy on the eyes */
+      --card: #FFFFFF;
+      --muted:#6B7280;
+      --line: #E7E1D6;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    body {
+      margin: 0; font-family: 'Cairo', sans-serif; background: var(--bg); color: var(--ink);
+      padding-bottom: 96px; /* room for the sticky bar */
+    }
+    header {
+      background: var(--blue); color: #fff; padding: 18px 16px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 5;
+    }
+    header .brand { font-weight: 800; font-size: 20px; letter-spacing: .5px; }
+    header .brand span { color: var(--gold); }
+    header .table { background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+      padding: 6px 12px; border-radius: 999px; font-size: 14px; font-weight: 600; }
+    .cat { padding: 18px 16px 4px; }
+    .cat h2 { font-size: 16px; color: var(--blue); margin: 0 0 10px; font-weight: 700;
+      display: flex; align-items: center; gap: 8px; }
+    .cat h2::before { content: ''; width: 4px; height: 18px; background: var(--gold); border-radius: 2px; }
+    .item {
+      background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+      margin: 0 16px 10px; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .item .info { display: flex; flex-direction: column; gap: 2px; }
+    .item .name { font-weight: 600; font-size: 16px; }
+    .item .price { color: var(--muted); font-size: 14px; }
+    .stepper { display: flex; align-items: center; gap: 10px; }
+    .stepper button {
+      width: 38px; height: 38px; border-radius: 10px; border: none; font-size: 22px; font-weight: 700;
+      background: var(--blue); color: #fff; line-height: 1; display: grid; place-items: center; cursor: pointer;
+    }
+    .stepper button.minus { background: #fff; color: var(--blue); border: 1.5px solid var(--blue); }
+    .stepper button:active { transform: scale(.94); }
+    .stepper .qty { min-width: 22px; text-align: center; font-weight: 700; font-size: 17px; }
+    .stepper .qty.zero { color: var(--line); }
+    .bar {
+      position: fixed; bottom: 0; left: 0; right: 0; background: var(--card);
+      border-top: 1px solid var(--line); padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      display: flex; align-items: center; gap: 12px; z-index: 6; box-shadow: 0 -6px 20px rgba(14,40,86,.06);
+    }
+    .bar .total { display: flex; flex-direction: column; }
+    .bar .total small { color: var(--muted); font-size: 12px; }
+    .bar .total b { font-size: 20px; color: var(--blue); }
+    .bar button.send {
+      flex: 1; background: var(--gold); color: #fff; border: none; border-radius: 12px;
+      padding: 15px; font-family: inherit; font-weight: 800; font-size: 17px; cursor: pointer;
+    }
+    .bar button.send:disabled { background: var(--line); color: var(--muted); }
+    .bar button.send:active:not(:disabled) { transform: scale(.98); }
+    .toast {
+      position: fixed; inset: 0; background: rgba(14,40,86,.92); color: #fff; display: none;
+      flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; z-index: 20;
+    }
+    .toast.show { display: flex; }
+    .toast .check { width: 84px; height: 84px; border-radius: 50%; background: var(--gold); display: grid; place-items: center;
+      font-size: 46px; margin-bottom: 18px; }
+    .toast h3 { font-size: 24px; margin: 0 0 8px; }
+    .toast p { color: rgba(255,255,255,.8); margin: 0 0 24px; }
+    .toast button { background: #fff; color: var(--blue); border: none; border-radius: 12px; padding: 13px 28px;
+      font-family: inherit; font-weight: 700; font-size: 16px; }
+    .loading { text-align: center; color: var(--muted); padding: 60px 16px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">وقتي<span>.</span></div>
+    <div class="table" id="tableLabel">ترابيزة —</div>
+  </header>
+
+  <main id="menu"><div class="loading">جاري تحميل القائمة…</div></main>
+
+  <div class="bar">
+    <div class="total"><small>الإجمالي</small><b id="totalLabel">0 ج</b></div>
+    <button class="send" id="sendBtn" disabled>اطلب</button>
+  </div>
+
+  <div class="toast" id="toast">
+    <div class="check">✓</div>
+    <h3>تم استلام طلبك</h3>
+    <p>هيوصلك حالاً. شكراً إنك مع وقتي.</p>
+    <button onclick="resetOrder()">تمام</button>
+  </div>
+
+  <script>
+    // ---- Config ----------------------------------------------------------
+    // Set this to the n8n webhook URL once the instance is back up.
+    const WEBHOOK_URL = "https://n8n.srv1023892.hstgr.cloud/webhook/cafe-order";
+    const MENU_URL = "menu.json";
+
+    // ---- State -----------------------------------------------------------
+    const cart = {};            // { itemId: qty }
+    let items = {};             // { itemId: {name, price} }
+    const params = new URLSearchParams(location.search);
+    const table = params.get("table") || "?";
+    document.getElementById("tableLabel").textContent = "ترابيزة " + table;
+
+    // ---- Load menu -------------------------------------------------------
+    fetch(MENU_URL).then(r => r.json()).then(renderMenu).catch(() => {
+      document.getElementById("menu").innerHTML =
+        '<div class="loading">تعذر تحميل القائمة. حاول تاني.</div>';
+    });
+
+    function renderMenu(data) {
+      const root = document.getElementById("menu");
+      root.innerHTML = "";
+      data.categories.forEach(cat => {
+        const sec = document.createElement("section");
+        sec.className = "cat";
+        sec.innerHTML = `<h2>${cat.name_ar}</h2>`;
+        cat.items.filter(i => i.active !== false).forEach(it => {
+          items[it.id] = { name: it.name_ar, price: it.price };
+          cart[it.id] = 0;
+          const row = document.createElement("div");
+          row.className = "item";
+          row.innerHTML = `
+            <div class="info">
+              <span class="name">${it.name_ar}</span>
+              <span class="price">${it.price} ج</span>
+            </div>
+            <div class="stepper">
+              <button class="minus" onclick="step('${it.id}',-1)">−</button>
+              <span class="qty zero" id="q-${it.id}">0</span>
+              <button class="plus" onclick="step('${it.id}',1)">+</button>
+            </div>`;
+          sec.appendChild(row);
+        });
+        root.appendChild(sec);
+      });
+    }
+
+    // ---- Cart ------------------------------------------------------------
+    function step(id, d) {
+      cart[id] = Math.max(0, (cart[id] || 0) + d);
+      const q = document.getElementById("q-" + id);
+      q.textContent = cart[id];
+      q.classList.toggle("zero", cart[id] === 0);
+      updateTotal();
+    }
+
+    function updateTotal() {
+      let total = 0, count = 0;
+      for (const id in cart) { total += cart[id] * items[id].price; count += cart[id]; }
+      document.getElementById("totalLabel").textContent = total + " ج";
+      document.getElementById("sendBtn").disabled = count === 0;
+      return total;
+    }
+
+    // ---- Submit ----------------------------------------------------------
+    document.getElementById("sendBtn").addEventListener("click", sendOrder);
+
+    function sendOrder() {
+      const lines = [];
+      let total = 0;
+      for (const id in cart) {
+        if (cart[id] > 0) {
+          lines.push({ id, name: items[id].name, qty: cart[id], price: items[id].price });
+          total += cart[id] * items[id].price;
+        }
+      }
+      if (!lines.length) return;
+
+      const payload = { table, items: lines, total, at: new Date().toISOString() };
+      const btn = document.getElementById("sendBtn");
+      btn.disabled = true; btn.textContent = "جاري الإرسال…";
+
+      // If no webhook yet (n8n still down), show success so the page is demoable.
+      if (!WEBHOOK_URL) {
+        console.log("ORDER (no webhook set):", payload);
+        setTimeout(() => showSuccess(), 500);
+        return;
+      }
+      fetch(WEBHOOK_URL, {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+      }).then(showSuccess).catch(() => {
+        btn.disabled = false; btn.textContent = "اطلب";
+        alert("حصل خطأ في الإرسال. حاول تاني أو نادي الجرسون.");
+      });
+    }
+
+    function showSuccess() { document.getElementById("toast").classList.add("show"); }
+    function resetOrder() {
+      for (const id in cart) step(id, -cart[id]);
+      document.getElementById("toast").classList.remove("show");
+      document.getElementById("sendBtn").textContent = "اطلب";
+    }
+  </script>
+</body>
+</html>
