@@ -289,6 +289,27 @@
       document.getElementById("itemSheet").classList.remove("show"); document.getElementById("cartSheet").classList.remove("show"); }
     document.getElementById("goBtn").onclick = openCart;
 
+    // ---------- Swipe-down-to-close (drag the grip / top of the sheet) ----------
+    document.querySelectorAll('.sheet').forEach(sheet => {
+      let startY = 0, dy = 0, drag = false;
+      sheet.addEventListener('touchstart', e => {
+        const top = sheet.getBoundingClientRect().top;
+        const y = e.touches[0].clientY;
+        if (y - top < 80 && sheet.scrollTop <= 0) { drag = true; startY = y; sheet.style.transition = 'none'; }
+      }, { passive: true });
+      sheet.addEventListener('touchmove', e => {
+        if (!drag) return;
+        dy = Math.max(0, e.touches[0].clientY - startY);
+        sheet.style.transform = `translateY(${dy}px)`;
+      }, { passive: true });
+      sheet.addEventListener('touchend', () => {
+        if (!drag) return;
+        drag = false; sheet.style.transition = '';
+        if (dy > 90) closeSheets();
+        sheet.style.transform = ''; dy = 0;
+      });
+    });
+
     function sendOrder() {
       if (!cart.length) return;
       const lines = cart.map(l => ({ name: l.sugar ? `${l.name} · ${sugarLabel(l.sugar)}` : l.name, qty: l.qty, price: l.price }));
