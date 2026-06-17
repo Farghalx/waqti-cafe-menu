@@ -1,27 +1,29 @@
 {
   "_note": "PLACEHOLDER PRICES — owner must confirm real prices before go-live. Prices in EGP.",
+  "_sugar": "Per item: 'style' = قهوة levels (سادة/على الريحة/مظبوط/زيادة), 'spoons' = ملاعق سكر (بدون..٤), null = no sugar choice.",
   "currency": "EGP",
+  "cafe_name_ar": "كافيه البوب",
   "categories": [
     {
       "id": "hot_basics",
       "name_ar": "مشروبات أساسية",
       "items": [
-        { "id": "shai", "name_ar": "شاي كشري", "price": 10, "active": true },
-        { "id": "shai_na3na3", "name_ar": "شاي بالنعناع", "price": 12, "active": true },
-        { "id": "ahwa_turki", "name_ar": "قهوة تركي", "price": 15, "active": true }
+        { "id": "shai", "name_ar": "شاي كشري", "price": 10, "sugar": "spoons", "active": true },
+        { "id": "shai_na3na3", "name_ar": "شاي بالنعناع", "price": 12, "sugar": "spoons", "active": true },
+        { "id": "ahwa_turki", "name_ar": "قهوة تركي", "price": 15, "sugar": "style", "active": true }
       ]
     },
     {
       "id": "herbal",
       "name_ar": "مشروبات عشبية",
       "items": [
-        { "id": "yansoon", "name_ar": "ينسون", "price": 12, "active": true },
-        { "id": "karkade_hot", "name_ar": "كركديه ساخن", "price": 12, "active": true },
-        { "id": "karkade_cold", "name_ar": "كركديه بارد (عناب)", "price": 15, "active": true },
-        { "id": "na3na3", "name_ar": "نعناع", "price": 10, "active": true },
-        { "id": "helba", "name_ar": "حلبة باللبن", "price": 18, "active": true },
-        { "id": "erfa", "name_ar": "قرفة باللبن بالمكسرات", "price": 22, "active": true },
-        { "id": "sahlab", "name_ar": "سحلب بالمكسرات", "price": 25, "active": true }
+        { "id": "yansoon", "name_ar": "ينسون", "price": 12, "sugar": "spoons", "active": true },
+        { "id": "karkade_hot", "name_ar": "كركديه ساخن", "price": 12, "sugar": "spoons", "active": true },
+        { "id": "karkade_cold", "name_ar": "كركديه بارد (عناب)", "price": 15, "sugar": "spoons", "active": true },
+        { "id": "na3na3", "name_ar": "نعناع", "price": 10, "sugar": "spoons", "active": true },
+        { "id": "helba", "name_ar": "حلبة باللبن", "price": 18, "sugar": "spoons", "active": true },
+        { "id": "erfa", "name_ar": "قرفة باللبن بالمكسرات", "price": 22, "sugar": "spoons", "active": true },
+        { "id": "sahlab", "name_ar": "سحلب بالمكسرات", "price": 25, "sugar": "spoons", "active": true }
       ]
     }
   ]
