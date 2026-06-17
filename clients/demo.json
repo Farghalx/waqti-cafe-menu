@@ -11,16 +11,18 @@
       "id": "food",
       "name_ar": "أكل",
       "items": [
-        { "id": "koshary", "name_ar": "كشري", "price": 35, "image": "img/sample-koshary.svg" },
-        { "id": "shawarma", "name_ar": "شاورما فراخ", "price": 60, "image": "img/sample-shawarma.svg" }
+        { "id": "koshary", "name_ar": "كشري", "price": 35, "image": "img/sample-koshary.jpg" },
+        { "id": "shawarma", "name_ar": "شاورما فراخ", "price": 60, "image": "img/sample-shawarma.jpg" }
       ]
     },
     {
       "id": "drinks",
       "name_ar": "مشروبات",
       "items": [
-        { "id": "mango", "name_ar": "عصير مانجو", "price": 30, "image": "img/sample-mango.svg" },
-        { "id": "coffee", "name_ar": "قهوة تركي", "price": 18, "sugar": "style", "image": "img/sample-coffee.svg" }
+        { "id": "mango", "name_ar": "عصير مانجو", "price": 30, "image": "img/sample-mango.jpg" },
+        { "id": "coffee", "name_ar": "قهوة تركي", "price": 18, "sugar": "style", "image": "img/sample-ahwa-turki.jpg" },
+        { "id": "karkade", "name_ar": "كركديه", "price": 15, "image": "img/sample-karkade.jpg" },
+        { "id": "sahlab", "name_ar": "سحلب بالمكسرات", "price": 25, "image": "img/sample-sahlab.jpg" }
       ]
     }
   ]

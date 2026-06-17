@@ -5,28 +5,28 @@
   "demo": false,
   "webhook": "https://n8n.srv1023892.hstgr.cloud/webhook/cafe-order",
   "theme": { "blue": "#0E2856", "blue2": "#173a72", "gold": "#C08C23", "gold2": "#E3B85A", "bg": "#F4EFE6" },
-  "_note": "PLACEHOLDER PRICES — confirm real prices before go-live.",
+  "_note": "PLACEHOLDER PRICES — confirm real prices before go-live. Photos on items we have shots for; na3na3/helba/erfa/karkade_hot still need their own photo.",
   "categories": [
     {
       "id": "hot_basics",
       "name_ar": "مشروبات أساسية",
       "items": [
-        { "id": "shai", "name_ar": "شاي كشري", "price": 10, "sugar": "spoons" },
-        { "id": "shai_na3na3", "name_ar": "شاي بالنعناع", "price": 12, "sugar": "spoons" },
-        { "id": "ahwa_turki", "name_ar": "قهوة تركي", "price": 15, "sugar": "style" }
+        { "id": "shai", "name_ar": "شاي كشري", "price": 10, "sugar": "spoons", "image": "img/sample-shai.jpg" },
+        { "id": "shai_na3na3", "name_ar": "شاي بالنعناع", "price": 12, "sugar": "spoons", "image": "img/sample-shai.jpg" },
+        { "id": "ahwa_turki", "name_ar": "قهوة تركي", "price": 15, "sugar": "style", "image": "img/sample-ahwa-turki.jpg" }
       ]
     },
     {
       "id": "herbal",
       "name_ar": "مشروبات عشبية",
       "items": [
-        { "id": "yansoon", "name_ar": "ينسون", "price": 12, "sugar": "spoons" },
+        { "id": "yansoon", "name_ar": "ينسون", "price": 12, "sugar": "spoons", "image": "img/sample-yansoon.jpg" },
         { "id": "karkade_hot", "name_ar": "كركديه ساخن", "price": 12, "sugar": "spoons" },
-        { "id": "karkade_cold", "name_ar": "كركديه بارد (عناب)", "price": 15, "sugar": "spoons" },
+        { "id": "karkade_cold", "name_ar": "كركديه بارد (عناب)", "price": 15, "sugar": "spoons", "image": "img/sample-karkade.jpg" },
         { "id": "na3na3", "name_ar": "نعناع", "price": 10, "sugar": "spoons" },
         { "id": "helba", "name_ar": "حلبة باللبن", "price": 18, "sugar": "spoons" },
         { "id": "erfa", "name_ar": "قرفة باللبن بالمكسرات", "price": 22, "sugar": "spoons" },
-        { "id": "sahlab", "name_ar": "سحلب بالمكسرات", "price": 25, "sugar": "spoons" }
+        { "id": "sahlab", "name_ar": "سحلب بالمكسرات", "price": 25, "sugar": "spoons", "image": "img/sample-sahlab.jpg" }
       ]
     }
   ]
