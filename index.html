@@ -68,7 +68,10 @@
       transform:translateY(120%); transition:transform .3s cubic-bezier(.2,.85,.25,1); box-shadow:var(--shadow-lg);
       max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
     .sheet.show { transform:translateY(0); }
-    .grip { width:42px; height:5px; background:var(--line); border-radius:999px; margin:6px auto 14px; cursor:pointer; }
+    .sheet-head { touch-action:none; cursor:grab; padding:12px 0 10px; margin:0 -18px 8px; }
+    .sheet-head:active { cursor:grabbing; }
+    .grip { width:46px; height:5px; background:var(--line); border-radius:999px; margin:0 auto; transition:background .15s, width .15s; }
+    .sheet-head:active .grip { background:var(--muted); width:60px; }
     .x-btn { position:absolute; top:12px; left:16px; width:34px; height:34px; border-radius:50%; background:var(--bg);
       border:none; font-size:20px; line-height:1; color:var(--muted); display:grid; place-items:center; cursor:pointer; z-index:3; }
     .x-btn:active { transform:scale(.92); }
@@ -132,7 +135,7 @@
 
   <div class="sheet" id="itemSheet">
     <button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button>
-    <div class="grip" onclick="closeSheets()"></div>
+    <div class="sheet-head"><div class="grip"></div></div>
     <img class="is-img" id="isImg" style="display:none" />
     <div class="title" id="isName"></div>
     <div class="price" id="isPrice"></div>
@@ -146,7 +149,7 @@
 
   <div class="sheet" id="cartSheet">
     <button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button>
-    <div class="grip" onclick="closeSheets()"></div>
+    <div class="sheet-head"><div class="grip"></div></div>
     <div class="title">طلبك</div>
     <div id="cartLines" style="margin-top:10px"></div>
     <div class="cart-total"><span>الإجمالي</span><b id="cartTotal">0</b></div>
@@ -289,25 +292,29 @@
       document.getElementById("itemSheet").classList.remove("show"); document.getElementById("cartSheet").classList.remove("show"); }
     document.getElementById("goBtn").onclick = openCart;
 
-    // ---------- Swipe-down-to-close (drag the grip / top of the sheet) ----------
+    // ---------- Drag the top bar to close (smooth, pointer-based) ----------
     document.querySelectorAll('.sheet').forEach(sheet => {
+      const head = sheet.querySelector('.sheet-head');
+      if (!head) return;
       let startY = 0, dy = 0, drag = false;
-      sheet.addEventListener('touchstart', e => {
-        const top = sheet.getBoundingClientRect().top;
-        const y = e.touches[0].clientY;
-        if (y - top < 80 && sheet.scrollTop <= 0) { drag = true; startY = y; sheet.style.transition = 'none'; }
-      }, { passive: true });
-      sheet.addEventListener('touchmove', e => {
+      head.addEventListener('pointerdown', e => {
+        drag = true; startY = e.clientY; dy = 0;
+        sheet.style.transition = 'none';
+        head.setPointerCapture(e.pointerId);
+      });
+      head.addEventListener('pointermove', e => {
         if (!drag) return;
-        dy = Math.max(0, e.touches[0].clientY - startY);
+        dy = Math.max(0, e.clientY - startY);
         sheet.style.transform = `translateY(${dy}px)`;
-      }, { passive: true });
-      sheet.addEventListener('touchend', () => {
+      });
+      const end = () => {
         if (!drag) return;
         drag = false; sheet.style.transition = '';
-        if (dy > 90) closeSheets();
+        if (dy > 90 || dy < 6) closeSheets();   // pull down to dismiss, or a simple tap
         sheet.style.transform = ''; dy = 0;
-      });
+      };
+      head.addEventListener('pointerup', end);
+      head.addEventListener('pointercancel', end);
     });
 
     function sendOrder() {
