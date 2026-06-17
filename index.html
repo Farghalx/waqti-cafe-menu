@@ -44,7 +44,7 @@
       box-shadow:var(--shadow); cursor:pointer; transition:transform .12s ease; }
     .card:active { transform:scale(.985); }
     .card .left { display:flex; align-items:center; gap:12px; min-width:0; }
-    .card .thumb { width:58px; height:58px; flex:0 0 auto; border-radius:12px; object-fit:cover; background:var(--bg); }
+    .card .thumb { width:84px; height:84px; flex:0 0 auto; border-radius:13px; object-fit:cover; background:var(--bg); }
     .card .info .name { font-weight:700; font-size:17px; }
     .card .info .price { color:var(--gold); font-size:14px; font-weight:700; margin-top:3px; }
     .card .add { width:42px; height:42px; flex:0 0 auto; border-radius:12px; background:var(--blue); color:#fff;
@@ -65,10 +65,14 @@
     .scrim.show { opacity:1; pointer-events:auto; }
     .sheet { position:fixed; left:0; right:0; bottom:0; z-index:21; background:var(--card);
       border-top-left-radius:24px; border-top-right-radius:24px; padding:8px 18px calc(20px + env(safe-area-inset-bottom));
-      transform:translateY(120%); transition:transform .3s cubic-bezier(.2,.85,.25,1); box-shadow:var(--shadow-lg); max-height:86vh; overflow-y:auto; }
+      transform:translateY(120%); transition:transform .3s cubic-bezier(.2,.85,.25,1); box-shadow:var(--shadow-lg);
+      max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
     .sheet.show { transform:translateY(0); }
-    .grip { width:42px; height:5px; background:var(--line); border-radius:999px; margin:6px auto 14px; }
-    .is-img { width:100%; height:170px; object-fit:cover; border-radius:16px; margin-bottom:14px; }
+    .grip { width:42px; height:5px; background:var(--line); border-radius:999px; margin:6px auto 14px; cursor:pointer; }
+    .x-btn { position:absolute; top:12px; left:16px; width:34px; height:34px; border-radius:50%; background:var(--bg);
+      border:none; font-size:20px; line-height:1; color:var(--muted); display:grid; place-items:center; cursor:pointer; z-index:3; }
+    .x-btn:active { transform:scale(.92); }
+    .is-img { width:100%; aspect-ratio:1/1; max-height:46vh; object-fit:cover; border-radius:16px; margin-bottom:14px; display:block; }
     .sheet .title { font-size:21px; font-weight:800; }
     .sheet .price { color:var(--gold); font-weight:700; margin-top:2px; margin-bottom:14px; }
     .lbl { font-size:13px; color:var(--muted); font-weight:700; margin:14px 0 9px; }
@@ -127,7 +131,8 @@
   <div class="scrim" id="scrim" onclick="closeSheets()"></div>
 
   <div class="sheet" id="itemSheet">
-    <div class="grip"></div>
+    <button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button>
+    <div class="grip" onclick="closeSheets()"></div>
     <img class="is-img" id="isImg" style="display:none" />
     <div class="title" id="isName"></div>
     <div class="price" id="isPrice"></div>
@@ -140,7 +145,8 @@
   </div>
 
   <div class="sheet" id="cartSheet">
-    <div class="grip"></div>
+    <button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button>
+    <div class="grip" onclick="closeSheets()"></div>
     <div class="title">طلبك</div>
     <div id="cartLines" style="margin-top:10px"></div>
     <div class="cart-total"><span>الإجمالي</span><b id="cartTotal">0</b></div>
