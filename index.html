@@ -68,14 +68,15 @@
     .sheet { position:fixed; left:0; right:0; bottom:0; z-index:21; background:var(--card);
       border-top-left-radius:24px; border-top-right-radius:24px; padding:8px 18px calc(20px + env(safe-area-inset-bottom));
       transform:translateY(120%); transition:transform .2s cubic-bezier(.2,.9,.2,1); box-shadow:var(--shadow-lg);
-      max-height:88vh; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+      max-height:85vh; max-height:85dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
     .sheet.show { transform:translateY(0); }
-    .sheet-head { touch-action:none; cursor:grab; padding:12px 0 10px; margin:0 -18px 8px; }
+    .sheet-head { position:sticky; top:0; z-index:5; background:var(--card); touch-action:none; cursor:grab;
+      padding:12px 0 10px; margin:0 -18px 8px; box-shadow:0 6px 10px -8px rgba(0,0,0,.12); }
     .sheet-head:active { cursor:grabbing; }
     .grip { width:46px; height:5px; background:var(--line); border-radius:999px; margin:0 auto; transition:background .15s, width .15s; }
     .sheet-head:active .grip { background:var(--muted); width:60px; }
-    .x-btn { position:absolute; top:12px; left:16px; width:34px; height:34px; border-radius:50%; background:var(--bg);
-      border:none; font-size:20px; line-height:1; color:var(--muted); display:grid; place-items:center; cursor:pointer; z-index:3; }
+    .x-btn { position:absolute; top:6px; left:10px; width:38px; height:38px; border-radius:50%; background:var(--bg);
+      border:1px solid var(--line); font-size:19px; line-height:1; color:var(--ink); display:grid; place-items:center; cursor:pointer; z-index:6; }
     .x-btn:active { transform:scale(.92); }
     .is-img { width:100%; aspect-ratio:1/1; max-height:46vh; object-fit:cover; border-radius:16px; margin-bottom:14px; display:block; }
     .sheet .title { font-size:21px; font-weight:800; }
@@ -145,8 +146,7 @@
   <div class="scrim" id="scrim" onclick="closeSheets()"></div>
 
   <div class="sheet" id="itemSheet">
-    <button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button>
-    <div class="sheet-head"><div class="grip"></div></div>
+    <div class="sheet-head"><button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button><div class="grip"></div></div>
     <img class="is-img" id="isImg" style="display:none" />
     <div class="title" id="isName"></div>
     <div class="is-desc" id="isDesc" style="display:none"></div>
@@ -163,8 +163,7 @@
   </div>
 
   <div class="sheet" id="cartSheet">
-    <button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button>
-    <div class="sheet-head"><div class="grip"></div></div>
+    <div class="sheet-head"><button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button><div class="grip"></div></div>
     <div class="title">طلبك</div>
     <div id="cartLines" style="margin-top:10px"></div>
     <div class="cart-total"><span>الإجمالي</span><b id="cartTotal">0</b></div>
