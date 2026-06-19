@@ -47,6 +47,8 @@
     .card .thumb { width:84px; height:84px; flex:0 0 auto; border-radius:13px; object-fit:cover; background:var(--bg); }
     .card .info .name { font-weight:700; font-size:17px; }
     .card .info .price { color:var(--gold); font-size:14px; font-weight:700; margin-top:3px; }
+    .card .info .desc { color:var(--muted); font-size:12.5px; margin-top:2px; line-height:1.5; }
+    .is-desc { color:var(--muted); font-size:14px; margin:-6px 0 12px; line-height:1.6; }
     .card .add { width:42px; height:42px; flex:0 0 auto; border-radius:12px; background:var(--blue); color:#fff;
       display:grid; place-items:center; font-size:26px; font-weight:700; line-height:1; }
     .card .add.has { background:var(--gold); }
@@ -142,7 +144,9 @@
     <div class="sheet-head"><div class="grip"></div></div>
     <img class="is-img" id="isImg" style="display:none" />
     <div class="title" id="isName"></div>
+    <div class="is-desc" id="isDesc" style="display:none"></div>
     <div class="price" id="isPrice"></div>
+    <div id="isVarWrap" style="display:none"><div class="lbl">الحجم</div><div class="chips" id="isVar"></div></div>
     <div id="isSugarWrap" style="display:none"><div class="lbl">السكر</div><div class="chips" id="isSugar"></div></div>
     <div class="qtyrow">
       <div class="lbl" style="margin:0">الكمية</div>
@@ -212,13 +216,21 @@
         sec.className = "cat"; sec.id = "cat-" + cat.id;
         sec.innerHTML = `<h2>${cat.name_ar}</h2>`;
         cat.items.filter(i => i.active !== false).forEach(it => {
-          items[it.id] = { name: it.name_ar, price: it.price, sugar: it.sugar || null, image: it.image || null };
+          items[it.id] = { name: it.name_ar, price: (it.price != null ? it.price : null),
+            variants: it.variants || null, sugar: it.sugar || null, image: it.image || null, desc: it.desc || null };
+          const pl = it.variants
+            ? ("من " + Math.min.apply(null, it.variants.map(function (v) { return v.price; })) + " " + CUR)
+            : (it.price + " " + CUR);
           const card = document.createElement("div");
           card.className = "card"; card.onclick = () => openItem(it.id);
           card.innerHTML = `
             <div class="left">
               ${it.image ? `<img class="thumb" src="${it.image}" alt="" loading="lazy" />` : ``}
-              <div class="info"><div class="name">${it.name_ar}</div><div class="price">${it.price} ${CUR}</div></div>
+              <div class="info">
+                <div class="name">${it.name_ar}</div>
+                ${it.desc ? `<div class="desc">${it.desc}</div>` : ``}
+                <div class="price">${pl}</div>
+              </div>
             </div>
             <div class="add" id="add-${it.id}">+</div>`;
           sec.appendChild(card);
@@ -227,34 +239,61 @@
       });
     }
 
+    function chipGroup(box, options, selectedName, onPick) {
+      box.innerHTML = "";
+      options.forEach(o => {
+        const c = document.createElement("button");
+        c.className = "chip" + (o.name === selectedName ? " sel" : "");
+        c.textContent = o.label;
+        c.onclick = () => { onPick(o); [...box.children].forEach(x => x.classList.remove("sel")); c.classList.add("sel"); };
+        box.appendChild(c);
+      });
+    }
+
     function openItem(id) {
       const it = items[id];
-      cur = { id, sugar: it.sugar ? SUGAR[it.sugar].def : null, qty: 1 };
+      cur = {
+        id, qty: 1,
+        variant: it.variants ? it.variants[0].name : null,
+        unit: it.variants ? it.variants[0].price : it.price,
+        sugar: it.sugar ? SUGAR[it.sugar].def : null
+      };
       const img = document.getElementById("isImg");
       if (it.image) { img.src = it.image; img.style.display = "block"; } else { img.style.display = "none"; }
       document.getElementById("isName").textContent = it.name;
-      document.getElementById("isPrice").textContent = it.price + " " + CUR;
+      const desc = document.getElementById("isDesc");
+      if (it.desc) { desc.textContent = it.desc; desc.style.display = "block"; } else { desc.style.display = "none"; }
       document.getElementById("isQty").textContent = "1";
-      const wrap = document.getElementById("isSugarWrap"), box = document.getElementById("isSugar");
+
+      const vWrap = document.getElementById("isVarWrap");
+      if (it.variants) {
+        vWrap.style.display = "block";
+        chipGroup(document.getElementById("isVar"),
+          it.variants.map(v => ({ name: v.name, label: `${v.name} — ${v.price} ${CUR}`, price: v.price })),
+          cur.variant, o => { cur.variant = o.name; cur.unit = o.price; updateModalPrice(); });
+      } else vWrap.style.display = "none";
+
+      const sWrap = document.getElementById("isSugarWrap");
       if (it.sugar) {
-        wrap.style.display = "block"; box.innerHTML = "";
-        SUGAR[it.sugar].options.forEach(opt => {
-          const c = document.createElement("button");
-          c.className = "chip" + (opt === cur.sugar ? " sel" : "");
-          c.textContent = sugarLabel(opt);
-          c.onclick = () => { cur.sugar = opt; [...box.children].forEach(x => x.classList.remove("sel")); c.classList.add("sel"); };
-          box.appendChild(c);
-        });
-      } else wrap.style.display = "none";
+        sWrap.style.display = "block";
+        chipGroup(document.getElementById("isSugar"),
+          SUGAR[it.sugar].options.map(s => ({ name: s, label: sugarLabel(s) })),
+          cur.sugar, o => { cur.sugar = o.name; });
+      } else sWrap.style.display = "none";
+
+      updateModalPrice();
       openSheet("itemSheet");
     }
+    function updateModalPrice() { document.getElementById("isPrice").textContent = cur.unit + " " + CUR; }
     function mQty(d) { cur.qty = Math.max(1, cur.qty + d); document.getElementById("isQty").textContent = cur.qty; }
 
     function addFromSheet() {
-      const it = items[cur.id], key = cur.id + "|" + (cur.sugar || "");
+      const it = items[cur.id];
+      const opts = [cur.variant, cur.sugar ? sugarLabel(cur.sugar) : null].filter(Boolean).join(" · ");
+      const key = cur.id + "|" + (cur.variant || "") + "|" + (cur.sugar || "");
       const found = cart.find(l => l.key === key);
       if (found) found.qty += cur.qty;
-      else cart.push({ key, id: cur.id, name: it.name, price: it.price, sugar: cur.sugar, qty: cur.qty });
+      else cart.push({ key, id: cur.id, name: it.name, opts: opts, price: cur.unit, qty: cur.qty });
       closeSheets(); refresh();
     }
 
@@ -280,7 +319,7 @@
         row.innerHTML = `
           <div class="l-info">
             <div class="l-name">${l.name}</div>
-            ${l.sugar ? `<div class="l-sug">${sugarLabel(l.sugar)}</div>` : ``}
+            ${l.opts ? `<div class="l-sug">${l.opts}</div>` : ``}
             <div class="l-price">${l.price * l.qty} ${CUR}</div>
           </div>
           <div class="c-step">
@@ -333,7 +372,7 @@
 
     function sendOrder() {
       if (!cart.length) return;
-      const lines = cart.map(l => ({ name: l.sugar ? `${l.name} · ${sugarLabel(l.sugar)}` : l.name, qty: l.qty, price: l.price }));
+      const lines = cart.map(l => ({ name: l.opts ? `${l.name} · ${l.opts}` : l.name, qty: l.qty, price: l.price }));
       const total = cart.reduce((s,l)=>s+l.price*l.qty,0);
       const payload = { client: CLIENT, table, items: lines, total, at: new Date().toISOString() };
       const btn = document.getElementById("sendBtn"); btn.disabled = true; btn.textContent = "جاري الإرسال…";

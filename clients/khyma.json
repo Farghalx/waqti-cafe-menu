@@ -1,0 +1,128 @@
+{
+  "id": "khyma",
+  "name_ar": "مطعم <b>الخيمة</b>",
+  "currency": "ج",
+  "demo": true,
+  "webhook": "",
+  "theme": { "blue": "#5C2018", "blue2": "#7A2C1E", "gold": "#D98324", "gold2": "#EFA94A", "bg": "#F4ECE0" },
+  "_note": "DEMO for El Khyma grill restaurant. Prices from their menu. Drinks are placeholder. Orders are NOT sent.",
+  "categories": [
+    {
+      "id": "grills",
+      "name_ar": "المشويات",
+      "items": [
+        { "id": "kabab_betlo", "name_ar": "كباب بتلو", "desc": "يقدم مع عيش وسلطات", "variants": [{"name":"ربع","price":200},{"name":"نص","price":400},{"name":"كيلو","price":800}] },
+        { "id": "kofta", "name_ar": "كفتة الخيمة", "desc": "يقدم مع عيش وسلطات", "variants": [{"name":"ربع","price":195},{"name":"نص","price":375},{"name":"كيلو","price":750}] },
+        { "id": "tarab", "name_ar": "طرب", "desc": "يقدم مع عيش وسلطات", "variants": [{"name":"ربع","price":200},{"name":"نص","price":400},{"name":"كيلو","price":800}] },
+        { "id": "meshakel", "name_ar": "مشكل كباب وكفتة", "variants": [{"name":"ربع","price":195},{"name":"نص","price":380},{"name":"كيلو","price":770}] },
+        { "id": "kebda", "name_ar": "كبدة بلدي مشوي", "variants": [{"name":"ربع","price":195},{"name":"نص","price":375},{"name":"كيلو","price":750}] },
+        { "id": "sogo2", "name_ar": "سجق مشوي", "variants": [{"name":"ربع","price":175},{"name":"نص","price":350},{"name":"كيلو","price":700}] },
+        { "id": "tika", "name_ar": "فراخ تكا", "variants": [{"name":"ربع","price":120},{"name":"نص","price":225},{"name":"كيلو","price":450}] },
+        { "id": "shish", "name_ar": "فراخ شيش", "variants": [{"name":"ربع","price":120},{"name":"نص","price":225},{"name":"كيلو","price":450}] },
+        { "id": "tawook", "name_ar": "فراخ شيش طاووق", "variants": [{"name":"ربع","price":120},{"name":"نص","price":225},{"name":"كيلو","price":450}] }
+      ]
+    },
+    {
+      "id": "mixes",
+      "name_ar": "ميكسات الخيمة",
+      "items": [
+        { "id": "mix_khyma", "name_ar": "ميكس الخيمة", "price": 319, "desc": "2 كفتة، 2 كباب، 2 كبدة، 3 شيش طاووق — مع أرز وسلطات وعيش" },
+        { "id": "mix_grill", "name_ar": "ميكس جريل", "price": 299, "desc": "ربع فراخ شيش، 2 كباب، 2 كفتة" },
+        { "id": "mix_raye2", "name_ar": "ميكس الرايق", "price": 319, "desc": "فرد حمام، 2 كبدة، 2 كفتة" },
+        { "id": "mix_madfa3", "name_ar": "ميكس مدفع رمضان", "price": 200, "desc": "ربع شيش، 2 كفتة" },
+        { "id": "mix_2onbola", "name_ar": "ميكس قنبلة الفحم", "price": 259, "desc": "2 كفتة، 2 كبدة، 2 كباب" },
+        { "id": "mix_chef", "name_ar": "ميكس شيف مصر", "price": 450, "desc": "3 كفتة، 3 كباب، 3 شيش طاووق، 3 طرب" },
+        { "id": "mix_younes", "name_ar": "ميكس يونس", "price": 130, "desc": "1 كفتة، 1 كباب، 2 شيش طاووق" }
+      ]
+    },
+    {
+      "id": "trays",
+      "name_ar": "صواني الخيمة",
+      "items": [
+        { "id": "tray_ramadan", "name_ar": "صنية رمضان جانا", "price": 559, "desc": "ربع فراخ شيش، ربع كفتة، ربع كباب، محشي" },
+        { "id": "tray_farha", "name_ar": "صنية فرحة الصايم", "price": 999, "desc": "نص فراخ شيش، فرد حمام، محشي، سمبوسة" },
+        { "id": "tray_bawat", "name_ar": "صنية البوات", "price": 1099, "desc": "نص فراخ شيش، نص كفتة، طرب، سمبوسة" },
+        { "id": "tray_3ezba", "name_ar": "صنية العزبة", "price": 1499, "desc": "3 فرد حمام، ربع كباب، ربع كفتة، ربع طرب" },
+        { "id": "tray_layla", "name_ar": "صنية الليلة الكبيرة", "price": 1999, "desc": "فرخة شيش، كيلو كفتة، نص سجق، طاجن بامية باللحمة، محاشي وسمبوسة" },
+        { "id": "tray_karam", "name_ar": "صنية أهل الكرم", "price": 2999, "desc": "فرخة ونص، كيلو كفتة، كيلو كباب، نص سجق، نص كبدة، محشي" },
+        { "id": "tray_khyma", "name_ar": "صنية الخيمة", "price": 4999, "desc": "2 فراخ شيش، 2 كيلو كفتة، كيلو سجق، كيلو كباب، كيلو كبدة، كيلو شيش طاووق، محشي وسمبوسة" }
+      ]
+    },
+    {
+      "id": "meats",
+      "name_ar": "المحمّر والمشمّر",
+      "items": [
+        { "id": "hamam", "name_ar": "فرد حمام مشوي أو محمّر", "price": 179 },
+        { "id": "moza", "name_ar": "موزة محمّر", "price": 199 },
+        { "id": "lahm_mohamar", "name_ar": "طبق لحم محمّر", "price": 199 },
+        { "id": "wara2_lahma", "name_ar": "ورقة لحمة", "price": 199 },
+        { "id": "wara2_kebda", "name_ar": "ورقة كبدة بلدي", "price": 199 },
+        { "id": "wara2_sogo2", "name_ar": "ورقة سجق", "price": 169 },
+        { "id": "wara2_mix1", "name_ar": "ورقة ميكس كبدة وسجق", "price": 259 },
+        { "id": "wara2_mix2", "name_ar": "ورقة ميكس الخيمة", "price": 419, "desc": "سجق + كبدة + لحمة" }
+      ]
+    },
+    {
+      "id": "tagines",
+      "name_ar": "طواجن الخيمة",
+      "items": [
+        { "id": "t_molokhia", "name_ar": "طاجن ملوخية سادة", "price": 55 },
+        { "id": "t_batates", "name_ar": "طاجن بطاطس سادة", "price": 50 },
+        { "id": "t_bamia", "name_ar": "طاجن بامية سادة", "price": 55 },
+        { "id": "t_khodar", "name_ar": "طاجن خضار مشكل سادة", "price": 60 },
+        { "id": "t_fatta", "name_ar": "طاجن فتة سادة", "price": 50 },
+        { "id": "t_roz", "name_ar": "طاجن أرز معمّر سادة", "price": 75 },
+        { "id": "t_wara2", "name_ar": "طاجن ورق عنب سادة", "price": 50 },
+        { "id": "t_lahma_basal", "name_ar": "طاجن لحمة بالبصل", "price": 225 },
+        { "id": "t_molokhia_lahma", "name_ar": "طاجن ملوخية باللحمة", "price": 225 },
+        { "id": "t_batates_lahma", "name_ar": "طاجن بطاطس باللحمة", "price": 230 },
+        { "id": "t_bamia_lahma", "name_ar": "طاجن بامية باللحمة", "price": 230 },
+        { "id": "t_khodar_lahma", "name_ar": "طاجن خضار مشكل باللحمة", "price": 230 },
+        { "id": "t_fatta_lahma", "name_ar": "طاجن فتة باللحمة", "price": 255 },
+        { "id": "t_roz_lahma", "name_ar": "طاجن أرز معمّر باللحمة", "price": 275 },
+        { "id": "t_wara2_kaware3", "name_ar": "طاجن ورق عنب بالكوارع", "price": 275 },
+        { "id": "t_fatta_moza", "name_ar": "طاجن فتة موزة", "price": 255 }
+      ]
+    },
+    {
+      "id": "salads",
+      "name_ar": "السلطات والمقبلات",
+      "items": [
+        { "id": "s_baba", "name_ar": "سلطة بابا غنوج", "price": 25 },
+        { "id": "s_tahina", "name_ar": "سلطة طحينة", "price": 25 },
+        { "id": "s_khadra", "name_ar": "سلطة خضراء", "price": 20 },
+        { "id": "s_tamatem", "name_ar": "سلطة طماطم مخلل", "price": 20 },
+        { "id": "s_bazingan", "name_ar": "سلطة باذنجان مخلل", "price": 25 },
+        { "id": "s_roz_abyad", "name_ar": "طبق أرز أبيض", "price": 30 },
+        { "id": "s_roz_basmati", "name_ar": "طبق أرز بسمتي", "price": 35 },
+        { "id": "s_mombar", "name_ar": "طبق ممبار", "price": 89 },
+        { "id": "s_sambosa_mix", "name_ar": "طبق سمبوسة ميكس", "price": 59 },
+        { "id": "s_sambosa_gebna", "name_ar": "طبق سمبوسة جبنة", "price": 49 },
+        { "id": "s_sambosa_lahma", "name_ar": "طبق سمبوسة لحمة", "price": 69 },
+        { "id": "s_mahashi", "name_ar": "طبق مشكل محاشي", "price": 85, "desc": "3 كوسة، 3 فلفل أخضر، 3 ورق عنب" }
+      ]
+    },
+    {
+      "id": "soup",
+      "name_ar": "الشوربة",
+      "items": [
+        { "id": "soup_lesan", "name_ar": "شوربة لسان عصفور", "price": 35 },
+        { "id": "soup_khodar", "name_ar": "شوربة خضار مشكل", "price": 40 },
+        { "id": "soup_dgag", "name_ar": "شوربة كريمة دجاج", "price": 80 },
+        { "id": "soup_lahma", "name_ar": "شوربة كريمة لحمة", "price": 100 }
+      ]
+    },
+    {
+      "id": "drinks",
+      "name_ar": "مشروبات",
+      "_note": "PLACEHOLDER prices — confirm with the restaurant.",
+      "items": [
+        { "id": "water", "name_ar": "مياه معدنية", "price": 10 },
+        { "id": "soft", "name_ar": "مشروب غازي", "price": 25 },
+        { "id": "juice", "name_ar": "عصير طازة", "price": 35 },
+        { "id": "tea", "name_ar": "شاي", "price": 15, "sugar": "spoons" },
+        { "id": "coffee", "name_ar": "قهوة تركي", "price": 20, "sugar": "style" }
+      ]
+    }
+  ]
+}
