@@ -85,6 +85,11 @@
     .chip { border:1.5px solid var(--line); background:#fff; color:var(--ink); font-family:inherit; font-weight:700;
       font-size:15px; padding:10px 16px; border-radius:12px; cursor:pointer; }
     .chip.sel { border-color:var(--blue); background:var(--blue); color:#fff; }
+    .note-input { width:100%; border:1.5px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:2px;
+      font-family:inherit; font-size:15px; resize:none; color:var(--ink); background:#fff; }
+    .note-input:focus { outline:none; border-color:var(--blue); }
+    .note-input::placeholder { color:#b3aa98; }
+    .l-note { color:var(--blue); font-size:13px; font-weight:600; margin-top:3px; }
     .qtyrow { display:flex; align-items:center; justify-content:space-between; margin-top:18px; }
     .stepper { display:flex; align-items:center; gap:16px; }
     .stepper button { width:44px; height:44px; border-radius:12px; border:none; font-size:24px; font-weight:800;
@@ -148,6 +153,8 @@
     <div class="price" id="isPrice"></div>
     <div id="isVarWrap" style="display:none"><div class="lbl">الحجم</div><div class="chips" id="isVar"></div></div>
     <div id="isSugarWrap" style="display:none"><div class="lbl">السكر</div><div class="chips" id="isSugar"></div></div>
+    <div class="lbl">أي تعديل على الطبق؟ <span style="font-weight:500">(اختياري)</span></div>
+    <textarea class="note-input" id="isNote" rows="2" placeholder="لو عايز تزوّد أو تشيل حاجة اكتبها — مثلاً: بدون بصل، زيادة شطة، السلطة على جنب، استواء كامل"></textarea>
     <div class="qtyrow">
       <div class="lbl" style="margin:0">الكمية</div>
       <div class="stepper"><button class="minus" onclick="mQty(-1)">−</button><span class="q" id="isQty">1</span><button onclick="mQty(1)">+</button></div>
@@ -264,6 +271,7 @@
       const desc = document.getElementById("isDesc");
       if (it.desc) { desc.textContent = it.desc; desc.style.display = "block"; } else { desc.style.display = "none"; }
       document.getElementById("isQty").textContent = "1";
+      document.getElementById("isNote").value = "";
 
       const vWrap = document.getElementById("isVarWrap");
       if (it.variants) {
@@ -287,13 +295,16 @@
     function updateModalPrice() { document.getElementById("isPrice").textContent = cur.unit + " " + CUR; }
     function mQty(d) { cur.qty = Math.max(1, cur.qty + d); document.getElementById("isQty").textContent = cur.qty; }
 
+    const esc = s => String(s).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+
     function addFromSheet() {
       const it = items[cur.id];
+      const note = (document.getElementById("isNote").value || "").trim();
       const opts = [cur.variant, cur.sugar ? sugarLabel(cur.sugar) : null].filter(Boolean).join(" · ");
-      const key = cur.id + "|" + (cur.variant || "") + "|" + (cur.sugar || "");
+      const key = cur.id + "|" + (cur.variant || "") + "|" + (cur.sugar || "") + "|" + note;
       const found = cart.find(l => l.key === key);
       if (found) found.qty += cur.qty;
-      else cart.push({ key, id: cur.id, name: it.name, opts: opts, price: cur.unit, qty: cur.qty });
+      else cart.push({ key, id: cur.id, name: it.name, opts: opts, note: note, price: cur.unit, qty: cur.qty });
       closeSheets(); refresh();
     }
 
@@ -320,6 +331,7 @@
           <div class="l-info">
             <div class="l-name">${l.name}</div>
             ${l.opts ? `<div class="l-sug">${l.opts}</div>` : ``}
+            ${l.note ? `<div class="l-note">📝 ${esc(l.note)}</div>` : ``}
             <div class="l-price">${l.price * l.qty} ${CUR}</div>
           </div>
           <div class="c-step">
@@ -372,7 +384,11 @@
 
     function sendOrder() {
       if (!cart.length) return;
-      const lines = cart.map(l => ({ name: l.opts ? `${l.name} · ${l.opts}` : l.name, qty: l.qty, price: l.price }));
+      const lines = cart.map(l => {
+        let name = l.opts ? `${l.name} · ${l.opts}` : l.name;
+        if (l.note) name += ` (${l.note})`;
+        return { name, qty: l.qty, price: l.price };
+      });
       const total = cart.reduce((s,l)=>s+l.price*l.qty,0);
       const payload = { client: CLIENT, table, items: lines, total, at: new Date().toISOString() };
       const btn = document.getElementById("sendBtn"); btn.disabled = true; btn.textContent = "جاري الإرسال…";
