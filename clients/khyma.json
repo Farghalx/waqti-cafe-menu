@@ -119,9 +119,9 @@
       "items": [
         { "id": "water", "name_ar": "مياه معدنية", "price": 10 },
         { "id": "soft", "name_ar": "مشروب غازي", "price": 25 },
-        { "id": "juice", "name_ar": "عصير طازة", "price": 35 },
-        { "id": "tea", "name_ar": "شاي", "price": 15, "sugar": "spoons" },
-        { "id": "coffee", "name_ar": "قهوة تركي", "price": 20, "sugar": "style" }
+        { "id": "juice", "name_ar": "عصير طازة", "price": 35, "image": "img/sample-mango.jpg" },
+        { "id": "tea", "name_ar": "شاي", "price": 15, "sugar": "spoons", "image": "img/sample-shai.jpg" },
+        { "id": "coffee", "name_ar": "قهوة تركي", "price": 20, "sugar": "style", "image": "img/sample-ahwa-turki.jpg" }
       ]
     }
   ]
