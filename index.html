@@ -190,7 +190,59 @@
 
     let CFG = {}, CUR = "ج", items = {}, cart = [], cur = null;
 
-    fetch(`clients/${CLIENT}.json`).then(r => r.json()).then(boot).catch(() => {
+    // ---------- Live price overrides (owner-editable Google Sheet) ----------
+    // Opt-in per client via cfg.price_sheet_csv (a published-CSV URL for the Menu tab).
+    // The Sheet only ever supplies PRICES — names, images, categories, variant structure
+    // stay in this JSON. Owner edits a number in Sheets, page picks it up on next load.
+    function parseCSV(text) {
+      const rows = []; let row = [], field = "", inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (inQuotes) {
+          if (c === '"' && text[i + 1] === '"') { field += '"'; i++; }
+          else if (c === '"') { inQuotes = false; }
+          else { field += c; }
+        } else if (c === '"') { inQuotes = true; }
+        else if (c === ',') { row.push(field); field = ""; }
+        else if (c === '\n' || c === '\r') {
+          if (c === '\r' && text[i + 1] === '\n') i++;
+          row.push(field); rows.push(row); row = []; field = "";
+        } else { field += c; }
+      }
+      if (field.length || row.length) { row.push(field); rows.push(row); }
+      return rows.filter(r => r.length > 1 || r[0] !== "");
+    }
+
+    function applyPriceOverrides(cfg) {
+      if (!cfg.price_sheet_csv) return Promise.resolve(cfg);
+      return fetch(cfg.price_sheet_csv).then(r => r.text()).then(text => {
+        const rows = parseCSV(text);
+        const header = rows.shift().map(h => h.trim().toLowerCase());
+        const idx = (name) => header.indexOf(name);
+        const iId = idx("item_id"), iVar = idx("variant"), iPrice = idx("price_egp"), iActive = idx("active");
+        const priceMap = {};
+        rows.forEach(r => {
+          if (iActive >= 0 && String(r[iActive]).trim().toUpperCase() === "FALSE") return;
+          const key = (r[iId] || "").trim() + "|" + (iVar >= 0 ? (r[iVar] || "").trim() : "");
+          const price = Number(r[iPrice]);
+          if (!isNaN(price)) priceMap[key] = price;
+        });
+        cfg.categories.forEach(cat => cat.items.forEach(it => {
+          if (it.variants) {
+            it.variants.forEach(v => {
+              const key = it.id + "|" + v.name;
+              if (priceMap[key] != null) v.price = priceMap[key];
+            });
+          } else {
+            const key = it.id + "|";
+            if (priceMap[key] != null) it.price = priceMap[key];
+          }
+        }));
+        return cfg;
+      }).catch(() => cfg); // Sheet unreachable -> fall back to JSON prices, never block the menu
+    }
+
+    fetch(`clients/${CLIENT}.json`).then(r => r.json()).then(applyPriceOverrides).then(boot).catch(() => {
       document.getElementById("menu").innerHTML = '<div class="loading">تعذر تحميل القائمة.</div>';
     });
 

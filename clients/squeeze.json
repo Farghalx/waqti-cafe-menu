@@ -1,0 +1,216 @@
+{
+  "id": "squeeze",
+  "name_ar": "Squeeze",
+  "currency": "ج",
+  "demo": true,
+  "webhook": "",
+  "theme": { "blue": "#12AEC4", "blue2": "#0D8AA0", "gold": "#8CC63E", "gold2": "#B7E070", "bg": "#FFF7FA" },
+  "_note": "DEMO for Squeeze (drinks + desserts, Mallawi — عاطف بركات بجوار بقيق). Prices transcribed from their printed menu photos. Fruit-salad prices weren't legible in the photo — placeholders, confirm with owner. Ice-cream + a couple of sahlab items show two sizes on the menu (printed like '15/20') — mapped here as صغير/كبير, confirm exact labels/order before go-live. Orders are NOT sent anywhere (demo mode).",
+  "price_sheet_csv": "https://docs.google.com/spreadsheets/d/1AO1kHsNWcLsDXUuTUcreEz4Ncu4Z63NqV8ONiSzvmbo/export?format=csv&gid=0",
+  "categories": [
+    {
+      "id": "frappe",
+      "name_ar": "فرابيه",
+      "items": [
+        { "id": "frappe_vanilla", "name_ar": "فرابيه فانيليا", "price": 55 },
+        { "id": "frappe_choco", "name_ar": "فرابيه شوكولت", "price": 60 },
+        { "id": "frappe_caramel", "name_ar": "فرابيه كراميل", "price": 60 },
+        { "id": "frappe_coffee", "name_ar": "فرابيه كوفي", "price": 60 },
+        { "id": "frappe_mocha", "name_ar": "فرابيه موكا", "price": 65 },
+        { "id": "frappe_white_mocha", "name_ar": "فرابيه وايت موكا", "price": 70 },
+        { "id": "frappe_oreo", "name_ar": "فرابيه أوريو", "price": 70 }
+      ]
+    },
+    {
+      "id": "ice_coffee",
+      "name_ar": "آيس كوفي",
+      "items": [
+        { "id": "ic_latte", "name_ar": "ايس لاتيه", "price": 50 },
+        { "id": "ic_spanish_latte", "name_ar": "ايس سبانيش لاتيه", "price": 55 },
+        { "id": "ic_mocha", "name_ar": "ايس موكا", "price": 60 },
+        { "id": "ic_white_mocha", "name_ar": "ايس وايت موكا", "price": 65 },
+        { "id": "ic_caramel_macchiato", "name_ar": "كراميل ماكياتو", "price": 65 },
+        { "id": "ic_matcha_latte", "name_ar": "ماتشا لاتيه", "price": 70 },
+        { "id": "ic_lotus_latte", "name_ar": "لوتس لاتيه", "price": 70 },
+        { "id": "ic_frap_caramel", "name_ar": "فرابيتشينو كراميل", "price": 75 },
+        { "id": "ic_frap_white", "name_ar": "فرابيتشينو وايت موكا", "price": 75 }
+      ]
+    },
+    {
+      "id": "milkshake",
+      "name_ar": "ميلك شيك",
+      "items": [
+        { "id": "ms_vanilla", "name_ar": "ميلك شيك فانيليا", "price": 55 },
+        { "id": "ms_choco", "name_ar": "ميلك شيك شوكولت", "price": 55 },
+        { "id": "ms_strawberry", "name_ar": "ميلك شيك فروله", "price": 55 },
+        { "id": "ms_banana", "name_ar": "ميلك شيك موز", "price": 60 },
+        { "id": "ms_oreo", "name_ar": "ميلك شيك أوريو", "price": 60 },
+        { "id": "ms_mango", "name_ar": "ميلك شيك مانجا", "price": 60 },
+        { "id": "ms_blueberry", "name_ar": "ميلك شيك بلوبيري", "price": 65 },
+        { "id": "ms_lotus", "name_ar": "ميلك شيك لوتس", "price": 65 },
+        { "id": "ms_pistachio", "name_ar": "ميلك شيك بستاشيو", "price": 70 },
+        { "id": "ms_galaxy", "name_ar": "ميلك شيك جالاكسي", "price": 70 },
+        { "id": "ms_kitkat", "name_ar": "ميلك شيك كيت كات", "price": 70 },
+        { "id": "ms_snickers", "name_ar": "ميلك شيك سنيكرز", "price": 80 },
+        { "id": "ms_brownie", "name_ar": "ميلك شيك براوني", "price": 85 },
+        { "id": "ms_squeeze_special", "name_ar": "ميلك شيك سكويز سبيشل", "price": 90 }
+      ]
+    },
+    {
+      "id": "hot_drinks",
+      "name_ar": "مشروبات ساخنة",
+      "items": [
+        { "id": "h_tea", "name_ar": "شاي", "price": 10, "sugar": "spoons" },
+        { "id": "h_green_tea", "name_ar": "شاي أخضر", "price": 15, "sugar": "spoons" },
+        { "id": "h_milk_tea", "name_ar": "شاي بحليب", "price": 10, "sugar": "spoons" },
+        { "id": "h_hot_cider", "name_ar": "هوت سيدر", "price": 40 },
+        { "id": "h_turkish_coffee", "name_ar": "قهوة تركي", "price": 25, "sugar": "style" },
+        { "id": "h_french_coffee", "name_ar": "قهوة فرنساوي", "price": 35 },
+        { "id": "h_hazelnut_coffee", "name_ar": "قهوة بندق", "price": 35 },
+        { "id": "h_hot_chocolate", "name_ar": "هوت شوكولت", "price": 35 }
+      ]
+    },
+    {
+      "id": "specialties",
+      "name_ar": "سحلب وسبيشلز",
+      "items": [
+        { "id": "sp_sahlab_plain", "name_ar": "سحلب سادة", "price": 40 },
+        { "id": "sp_sahlab_nuts", "name_ar": "سحلب بالمكسرات", "price": 50 },
+        { "id": "sp_kitkat", "name_ar": "هوت كيت كات", "variants": [{"name":"صغير","price":25},{"name":"كبير","price":30}] },
+        { "id": "sp_snickers", "name_ar": "هوت سنيكرز", "price": 30 },
+        { "id": "sp_hot_oreo", "name_ar": "هوت أوريو", "variants": [{"name":"صغير","price":25},{"name":"كبير","price":30}] },
+        { "id": "sp_hot_lotus", "name_ar": "هوت لوتس", "price": 30 },
+        { "id": "sp_hot_pistachio", "name_ar": "هوت بستاشيو", "price": 30 }
+      ]
+    },
+    {
+      "id": "smoothies",
+      "name_ar": "سموزي",
+      "items": [
+        { "id": "sm_lemon", "name_ar": "سموزي ليمون", "price": 30 },
+        { "id": "sm_lemon_mint", "name_ar": "سموزي ليمون بالنعناع", "price": 35 },
+        { "id": "sm_watermelon", "name_ar": "سموزي بطيخ", "price": 50 },
+        { "id": "sm_strawberry", "name_ar": "سموزي فراولة", "price": 50 },
+        { "id": "sm_mango", "name_ar": "سموزي مانجو", "price": 55 },
+        { "id": "sm_blueberry", "name_ar": "سموزي بلوبيري", "price": 60 },
+        { "id": "sm_kiwi", "name_ar": "سموزي كيوي", "price": 65 },
+        { "id": "sm_passion", "name_ar": "سموزي باشن فروت", "price": 65 }
+      ]
+    },
+    {
+      "id": "juices",
+      "name_ar": "عصائر",
+      "items": [
+        { "id": "j_lemon", "name_ar": "عصير ليمون", "price": 30 },
+        { "id": "j_lemon_mint", "name_ar": "عصير ليمون بالنعناع", "price": 35 },
+        { "id": "j_strawberry", "name_ar": "عصير فراولة", "price": 45 },
+        { "id": "j_guava", "name_ar": "عصير جوافة", "price": 45 },
+        { "id": "j_banana_milk", "name_ar": "عصير موز باللبن", "price": 45 },
+        { "id": "j_mango", "name_ar": "عصير مانجو", "price": 50 },
+        { "id": "j_kiwi", "name_ar": "عصير كيوي", "price": 65 },
+        { "id": "j_avocado", "name_ar": "عصير أفوكادو", "price": 65 }
+      ]
+    },
+    {
+      "id": "mojito",
+      "name_ar": "موهيتو",
+      "items": [
+        { "id": "mj_blue", "name_ar": "موهيتو أزرق", "price": 55 },
+        { "id": "mj_mint", "name_ar": "موهيتو نعناع", "price": 55 },
+        { "id": "mj_strawberry", "name_ar": "موهيتو فراولة", "price": 55 },
+        { "id": "mj_blueberry", "name_ar": "موهيتو بلوبيري", "price": 55 },
+        { "id": "mj_passion", "name_ar": "موهيتو باشن فروت", "price": 55 },
+        { "id": "mj_redbull", "name_ar": "ريدبول موهيتو", "price": 80 },
+        { "id": "mj_redbull_blueberry", "name_ar": "ريدبول بلوبيري", "price": 80 },
+        { "id": "mj_redbull_passion", "name_ar": "ريدبول باشن فروت", "price": 80 }
+      ]
+    },
+    {
+      "id": "pancakes",
+      "name_ar": "ميني بان كيك",
+      "items": [
+        { "id": "pc_fruit", "name_ar": "بان كيك فواكه", "price": 50 },
+        { "id": "pc_lotus", "name_ar": "بان كيك لوتس", "price": 50 },
+        { "id": "pc_nutella", "name_ar": "بان كيك نوتيلا / شوكولت", "price": 60 },
+        { "id": "pc_pistachio", "name_ar": "بان كيك بستاشيو", "price": 60 }
+      ]
+    },
+    {
+      "id": "crepe",
+      "name_ar": "كريب",
+      "items": [
+        { "id": "cr_choco", "name_ar": "كريب شوكولت", "price": 50 },
+        { "id": "cr_oreo", "name_ar": "كريب أوريو", "price": 60 },
+        { "id": "cr_strawberry", "name_ar": "كريب فروله", "price": 60 },
+        { "id": "cr_blueberry", "name_ar": "كريب بلوبيري", "price": 60 },
+        { "id": "cr_lotus", "name_ar": "كريب لوتس", "price": 70 }
+      ]
+    },
+    {
+      "id": "waffle",
+      "name_ar": "وافل",
+      "items": [
+        { "id": "wf_caramel", "name_ar": "وافل كراميل", "price": 50 },
+        { "id": "wf_choco", "name_ar": "وافل شوكولت", "price": 55 },
+        { "id": "wf_white_choco", "name_ar": "وافل وايت شوكولت", "price": 55 },
+        { "id": "wf_lotus", "name_ar": "وافل لوتس", "price": 65 },
+        { "id": "wf_pistachio", "name_ar": "وافل بستاشيو", "price": 65 },
+        { "id": "wf_fruit", "name_ar": "وافل فواكه", "price": 70 }
+      ]
+    },
+    {
+      "id": "ice_cream",
+      "name_ar": "آيس كريم",
+      "items": [
+        { "id": "icecream_mango", "name_ar": "آيس كريم مانجو", "variants": [{"name":"صغير","price":15},{"name":"كبير","price":20}] },
+        { "id": "icecream_vanilla", "name_ar": "آيس كريم فانيليا", "variants": [{"name":"صغير","price":15},{"name":"كبير","price":20}] },
+        { "id": "icecream_pistachio", "name_ar": "آيس كريم بستاشيو", "variants": [{"name":"صغير","price":15},{"name":"كبير","price":20}] },
+        { "id": "icecream_strawberry", "name_ar": "آيس كريم فروله", "variants": [{"name":"صغير","price":15},{"name":"كبير","price":20}] },
+        { "id": "icecream_lotus", "name_ar": "آيس كريم لوتس", "variants": [{"name":"صغير","price":15},{"name":"كبير","price":20}] },
+        { "id": "icecream_nutella", "name_ar": "آيس كريم نوتيلا", "variants": [{"name":"صغير","price":15},{"name":"كبير","price":20}] }
+      ]
+    },
+    {
+      "id": "fruit_salad",
+      "name_ar": "سلطة فواكه",
+      "_note": "Prices not legible in menu photo — placeholders, confirm with owner.",
+      "items": [
+        { "id": "fs_plain", "name_ar": "سلطة الفواكه العادية", "price": 50 },
+        { "id": "fs_squeeze", "name_ar": "سلطة فواكه اسكويز", "price": 65 },
+        { "id": "fs_pistachio", "name_ar": "سلطة فواكه بستاشيو", "price": 70 },
+        { "id": "fs_honey_nuts", "name_ar": "سلطة فواكه بالمكسرات والعسل", "price": 70 },
+        { "id": "fs_icecream", "name_ar": "سلطة فواكه بالآيس كريم", "price": 75 }
+      ]
+    },
+    {
+      "id": "cocktails",
+      "name_ar": "كوكتيلات",
+      "items": [
+        { "id": "ck_awar2alb", "name_ar": "عوار قلب", "price": 50 },
+        { "id": "ck_cocktail", "name_ar": "كوكتيل", "price": 50 },
+        { "id": "ck_esfahani", "name_ar": "أصفهاني", "price": 50 },
+        { "id": "ck_attata", "name_ar": "أتاتا", "price": 50 },
+        { "id": "ck_panorama", "name_ar": "بانوراما", "price": 50 },
+        { "id": "ck_squeeze", "name_ar": "سكويز", "price": 50 }
+      ]
+    },
+    {
+      "id": "soft_drinks",
+      "name_ar": "مشروبات غازية وباردة",
+      "items": [
+        { "id": "sd_water", "name_ar": "مياه صغيرة", "price": 7 },
+        { "id": "sd_soda", "name_ar": "مشروب غازي", "price": 30 },
+        { "id": "sd_redbull", "name_ar": "ريد بول", "price": 70 }
+      ]
+    },
+    {
+      "id": "extras",
+      "name_ar": "إضافات",
+      "items": [
+        { "id": "ex_flavor", "name_ar": "نكهة إضافية", "price": 20 },
+        { "id": "ex_espresso_shot", "name_ar": "شوت إسبريسو", "price": 20 },
+        { "id": "ex_extra", "name_ar": "إضافة إكسترا", "price": 20 }
+      ]
+    }
+  ]
+}
