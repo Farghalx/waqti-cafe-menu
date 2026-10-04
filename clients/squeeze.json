@@ -7,6 +7,10 @@
   "theme": { "blue": "#12AEC4", "blue2": "#0D8AA0", "gold": "#8CC63E", "gold2": "#B7E070", "bg": "#FFF7FA" },
   "_note": "DEMO for Squeeze (drinks + desserts, Mallawi — عاطف بركات بجوار بقيق). Prices transcribed from their printed menu photos. Fruit-salad prices weren't legible in the photo — placeholders, confirm with owner. Ice-cream + a couple of sahlab items show two sizes on the menu (printed like '15/20') — mapped here as صغير/كبير, confirm exact labels/order before go-live. Orders are NOT sent anywhere (demo mode).",
   "price_sheet_csv": "https://docs.google.com/spreadsheets/d/1AO1kHsNWcLsDXUuTUcreEz4Ncu4Z63NqV8ONiSzvmbo/export?format=csv&gid=0",
+  "admin_pin": "0304",
+  "admin_webhook": "",
+  "admin_key": "69e947ed5e8b6b8d",
+  "_admin_note": "admin_webhook is blank -> admin.html runs in demo/mock mode. Once apps_script_v2.gs is pasted + deployed on this Sheet (set ADMIN_KEY = 69e947ed5e8b6b8d to match), paste the /exec URL here to go live. admin_pin is the last 4 digits of their listed phone (01112030304) — tell the owner to change it.",
   "categories": [
     {
       "id": "frappe",

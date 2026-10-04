@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <title>لوحة الإدارة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --blue:#0E2856; --blue-2:#173a72; --gold:#C08C23; --gold-2:#E3B85A;
+      --bg:#F4EFE6; --card:#FFFFFF; --ink:#181410; --muted:#8C8475; --line:#ECE4D6;
+      --shadow:0 6px 24px rgba(14,40,86,.08); --ok:#2E9E5B; --cancel:#C23B3B;
+    }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html,body { margin:0; }
+    body { font-family:'Cairo',sans-serif; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
+    .demoflag { background:#ffce5c; color:#5b4300; text-align:center; font-weight:800; font-size:13px; padding:6px; }
+    .hero { background:linear-gradient(135deg,var(--blue) 0%,var(--blue-2) 100%); color:#fff;
+      padding:22px 20px 26px; border-bottom-left-radius:26px; border-bottom-right-radius:26px; }
+    .hero .cafe { font-size:22px; font-weight:800; }
+    .hero .sub { margin-top:4px; font-size:13px; color:rgba(255,255,255,.75); font-weight:600; }
+
+    /* ---- PIN screen ---- */
+    .pin-wrap { max-width:360px; margin:18vh auto 0; padding:0 24px; text-align:center; }
+    .pin-wrap h2 { font-size:19px; margin-bottom:18px; }
+    .pin-wrap input { width:100%; text-align:center; letter-spacing:10px; font-size:26px; font-weight:800;
+      font-family:inherit; border:1.5px solid var(--line); border-radius:14px; padding:16px; background:var(--card);
+      color:var(--ink); }
+    .pin-wrap input:focus { outline:none; border-color:var(--blue); }
+    .pin-wrap button { width:100%; margin-top:14px; background:var(--blue); color:#fff; border:none; border-radius:14px;
+      padding:15px; font-family:inherit; font-weight:800; font-size:16px; cursor:pointer; }
+    .pin-err { color:var(--cancel); font-size:13px; font-weight:700; margin-top:10px; display:none; }
+
+    /* ---- Dashboard ---- */
+    #dash { display:none; padding-bottom:40px; }
+    .stats { display:flex; gap:10px; padding:16px; margin-top:-18px; }
+    .stat { flex:1; background:var(--card); border-radius:16px; padding:14px; box-shadow:var(--shadow); text-align:center; }
+    .stat b { display:block; font-size:22px; color:var(--blue); }
+    .stat small { color:var(--muted); font-size:12px; font-weight:700; }
+    .listwrap { padding:0 16px; }
+    .order { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:10px;
+      box-shadow:var(--shadow); }
+    .order.cancelled { opacity:.5; }
+    .order .row1 { display:flex; justify-content:space-between; align-items:center; font-weight:800; font-size:15px; }
+    .order .tbl { color:var(--blue); }
+    .order .time { color:var(--muted); font-size:12.5px; font-weight:600; }
+    .order .items { margin:8px 0; font-size:14px; color:var(--ink); line-height:1.6; }
+    .order .row2 { display:flex; justify-content:space-between; align-items:center; margin-top:4px; }
+    .order .total { color:var(--gold); font-weight:800; font-size:16px; }
+    .order .cancel-btn { background:#fff; border:1.5px solid var(--cancel); color:var(--cancel); font-family:inherit;
+      font-weight:700; font-size:13px; padding:7px 14px; border-radius:10px; cursor:pointer; }
+    .order .cancel-btn:active { transform:scale(.96); }
+    .order .status-chip { font-size:12px; font-weight:800; padding:4px 10px; border-radius:999px; }
+    .status-chip.cancelled { background:#fbe5e5; color:var(--cancel); }
+    .empty { text-align:center; color:var(--muted); padding:60px 16px; font-weight:600; }
+    .refresh-note { text-align:center; color:var(--muted); font-size:12px; padding:10px; }
+  </style>
+</head>
+<body>
+  <div class="demoflag" id="demoFlag" style="display:none">وضع العرض — بيانات تجريبية، مش طلبات حقيقية</div>
+
+  <div class="pin-wrap" id="pinScreen">
+    <h2 id="pinTitle">لوحة الإدارة</h2>
+    <input id="pinInput" inputmode="numeric" maxlength="6" placeholder="••••" autofocus />
+    <button onclick="tryPin()">دخول</button>
+    <div class="pin-err" id="pinErr">الرقم غلط، جرب تاني</div>
+  </div>
+
+  <div id="dash">
+    <div class="hero">
+      <div class="cafe" id="cafeName">…</div>
+      <div class="sub">لوحة الإدارة — الطلبات والإجمالي</div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b id="statCount">0</b><small>عدد الطلبات</small></div>
+      <div class="stat"><b id="statTotal">0</b><small>الإجمالي المتوقع</small></div>
+    </div>
+    <div class="listwrap" id="list"></div>
+    <div class="refresh-note" id="refreshNote"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const CLIENT = params.get("c") || "elbob";
+    let CFG = {}, CUR = "ج", LIVE = false, mockOrders = [], POLL = null;
+
+    fetch(`clients/${CLIENT}.json`).then(r => r.json()).then(boot).catch(() => {
+      document.getElementById("pinTitle").textContent = "تعذر تحميل الإعدادات";
+    });
+
+    function boot(cfg) {
+      CFG = cfg; CUR = cfg.currency || "ج";
+      if (cfg.theme) {
+        const t = cfg.theme, root = document.documentElement.style;
+        if (t.blue) root.setProperty('--blue', t.blue);
+        if (t.blue2) root.setProperty('--blue-2', t.blue2);
+        if (t.gold) root.setProperty('--gold', t.gold);
+        if (t.gold2) root.setProperty('--gold-2', t.gold2);
+        if (t.bg) root.setProperty('--bg', t.bg);
+      }
+      document.getElementById("cafeName").innerHTML = cfg.name_ar || "وقتي";
+      document.getElementById("pinTitle").textContent = (cfg.name_ar ? cfg.name_ar.replace(/<[^>]+>/g,'') + " — " : "") + "لوحة الإدارة";
+      document.title = "لوحة الإدارة — " + (cfg.name_ar || "وقتي").replace(/<[^>]+>/g,'');
+      LIVE = !!cfg.admin_webhook;
+      document.getElementById("pinInput").addEventListener("keydown", e => { if (e.key === "Enter") tryPin(); });
+    }
+
+    function tryPin() {
+      const val = document.getElementById("pinInput").value.trim();
+      if (!CFG.admin_pin || val !== String(CFG.admin_pin)) {
+        document.getElementById("pinErr").style.display = "block";
+        return;
+      }
+      document.getElementById("pinScreen").style.display = "none";
+      document.getElementById("dash").style.display = "block";
+      if (!LIVE) {
+        document.getElementById("demoFlag").style.display = "block";
+        document.getElementById("refreshNote").textContent = "بيانات تجريبية — هتتبدل بطلبات حقيقية أول ما النظام يشتغل فعلياً";
+        seedMockOrders();
+        renderMock();
+      } else {
+        document.getElementById("refreshNote").textContent = "بيتحدث كل 15 ثانية";
+        refreshLive();
+        POLL = setInterval(refreshLive, 15000);
+      }
+    }
+
+    // ---------- Live mode (real Apps Script) ----------
+    function refreshLive() {
+      const url = `${CFG.admin_webhook}?action=list&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(data => {
+        if (data.error) { document.getElementById("refreshNote").textContent = "خطأ: " + data.error; return; }
+        renderOrders(data.orders, data.expected_cash, cancelLive);
+      }).catch(() => { document.getElementById("refreshNote").textContent = "تعذر الاتصال — هيحاول تاني"; });
+    }
+    function cancelLive(id) {
+      const url = `${CFG.admin_webhook}?action=cancel&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(() => refreshLive());
+    }
+
+    // ---------- Demo mode (mock data, no backend) ----------
+    function seedMockOrders() {
+      const now = Date.now();
+      const sample = [
+        { table: "2", items: "1× فرابيه فانيليا، 1× ميلك شيك أوريو", total: 115 },
+        { table: "5", items: "2× موهيتو فراولة", total: 110 },
+        { table: "1", items: "1× وافل لوتس، 1× عصير مانجو", total: 115 },
+        { table: "3", items: "1× آيس كريم فروله (كبير)", total: 20 },
+        { table: "4", items: "1× سموزي بلوبيري، 1× كريب أوريو", total: 120 },
+        { table: "2", items: "1× ميلك شيك سكويز سبيشل", total: 90 },
+        { table: "6", items: "3× شاي، 1× سحلب بالمكسرات", total: 80 },
+      ];
+      mockOrders = sample.map((o, i) => ({
+        id: "demo" + i, table: o.table, items: o.items, total: o.total, status: "new",
+        time: new Date(now - (sample.length - i) * 11 * 60000).toTimeString().slice(0, 5)
+      }));
+    }
+    function renderMock() {
+      const total = mockOrders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
+      renderOrders(mockOrders, total, (id) => {
+        const o = mockOrders.find(x => x.id === id);
+        if (o) o.status = "cancelled";
+        renderMock();
+      });
+    }
+
+    // ---------- Shared render ----------
+    function renderOrders(orders, total, onCancel) {
+      const activeCount = orders.filter(o => o.status !== "cancelled").length;
+      document.getElementById("statCount").textContent = activeCount;
+      document.getElementById("statTotal").textContent = total + " " + CUR;
+      const box = document.getElementById("list");
+      if (!orders.length) { box.innerHTML = '<div class="empty">لسه مفيش طلبات النهاردة</div>'; return; }
+      box.innerHTML = "";
+      [...orders].reverse().forEach(o => {
+        const cancelled = o.status === "cancelled";
+        const el = document.createElement("div");
+        el.className = "order" + (cancelled ? " cancelled" : "");
+        el.innerHTML = `
+          <div class="row1"><span class="tbl">ترابيزة ${o.table}</span><span class="time">${o.time}</span></div>
+          <div class="items">${o.items}</div>
+          <div class="row2">
+            <span class="total">${o.total} ${CUR}</span>
+            ${cancelled ? '<span class="status-chip cancelled">ملغي</span>' : `<button class="cancel-btn" data-id="${o.id}">إلغاء الطلب</button>`}
+          </div>`;
+        if (!cancelled) el.querySelector(".cancel-btn").onclick = () => {
+          if (confirm("تأكيد إلغاء طلب ترابيزة " + o.table + "؟")) onCancel(o.id);
+        };
+        box.appendChild(el);
+      });
+    }
+  </script>
+</body>
+</html>
