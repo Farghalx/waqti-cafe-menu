@@ -42,7 +42,7 @@ import arabic_reshaper
 from bidi.algorithm import get_display
 
 # ---------------- Config ----------------
-PRINTER_NAME = "Printer POS-80"   # exact Windows printer queue name — verify in step 2 above
+PRINTER_NAME = "cashier"   # exact Windows printer queue name (confirmed via win32print.EnumPrinters, 2026-10-05) — verify in step 2 above
 
 ADMIN_WEBHOOK = "https://script.google.com/macros/s/AKfycbxh3-0tNyirbMBFXuIfpcx_NJkvh0bLBavgcJoGHvEQ2TvA6R_t-bMa-vYn-v0lhoQTgQ/exec"
 ADMIN_KEY = "69e947ed5e8b6b8d"
