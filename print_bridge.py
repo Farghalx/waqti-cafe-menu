@@ -1,33 +1,24 @@
 """
 Waqti cafe — printer bridge (Squeeze).
 
-Confirmed hardware (checked on-site 2026-10-04):
+Confirmed hardware (checked on-site 2026-10-04/05):
   Printer: Xprinter XP-Q808K, ESC/POS, USB+LAN (currently wired via USB)
-  USB ID : VID_1FC9&PID_2016
-  Windows already has it installed as a working printer queue named "Printer POS-80"
-    -> we print through THAT queue (raw ESC/POS bytes via the Windows spooler),
-       not by opening the USB device directly. No driver swap needed (no Zadig/
-       libusb), and it can't conflict with their existing POS software also
-       printing to the same queue.
+  Windows print queue name: "cashier" (NOT "Printer POS-80" — that was just the
+    USB device's hardware description in Device Manager, not the queue name)
+    -> we print through the "cashier" queue (raw ESC/POS bytes via the Windows
+       spooler), not by opening the USB device directly. No driver swap needed.
+
+ARABIC: ESC/POS printers have no built-in Arabic character set/shaping engine —
+text-mode printing renders Arabic as garbled disconnected glyphs no matter what
+encoding you declare. Fix: render the whole receipt as a bitmap image instead
+(printers can always print pixels). Within that image, Arabic letters and
+digits/symbols are drawn with SEPARATE fonts and composited run-by-run — tested
+locally and confirmed no single common font has correct glyphs for both shaped
+Arabic presentation forms AND plain digits at once.
 
 Runs on their PC. Polls the same Apps Script endpoint the admin dashboard uses
 (?action=list) for new orders and prints each one on the Xprinter the moment
-it shows up.
-
-SETUP (one-time, on their PC):
-  1. pip install python-escpos pywin32
-  2. Confirm the exact printer name: Settings -> Bluetooth & devices ->
-     Printers & scanners. If it's not literally "Printer POS-80", update
-     PRINTER_NAME below to match exactly (case-sensitive).
-  3. Set ADMIN_WEBHOOK (the apps_script_v2.gs /exec URL once deployed) + ADMIN_KEY
-     (must match the ADMIN_KEY constant set inside that script).
-  4. Run: python print_bridge.py
-     -> it should print nothing yet (no orders), just sit there polling.
-  5. Make it start automatically: Task Scheduler -> Create Task -> trigger
-     "At log on" -> action "python print_bridge.py" -> keeps it running
-     whenever the PC is on, same way the kitchen phone just stays open on Telegram.
-
-This only prints — it never touches their existing cafe-management software.
+it shows up. This only prints — it never touches their existing POS software.
 """
 
 import json
@@ -35,22 +26,29 @@ import os
 import sys
 import time
 import urllib.request
+from datetime import datetime, timedelta
 
 import win32print
 from escpos.printer import Dummy
+from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
 from bidi.algorithm import get_display
 
 # ---------------- Config ----------------
-PRINTER_NAME = "cashier"   # exact Windows printer queue name (confirmed via win32print.EnumPrinters, 2026-10-05) — verify in step 2 above
+PRINTER_NAME = "cashier"   # exact Windows printer queue name (confirmed via win32print.EnumPrinters, 2026-10-05)
 
 ADMIN_WEBHOOK = "https://script.google.com/macros/s/AKfycbxh3-0tNyirbMBFXuIfpcx_NJkvh0bLBavgcJoGHvEQ2TvA6R_t-bMa-vYn-v0lhoQTgQ/exec"
 ADMIN_KEY = "69e947ed5e8b6b8d"
-POLL_SECONDS = 6
+POLL_SECONDS = 2
+
+ARABIC_FONT_PATH = r"C:\Windows\Fonts\tahoma.ttf"   # Arabic letters (shaped presentation forms)
+LATIN_FONT_PATH = r"C:\Windows\Fonts\arial.ttf"     # digits, ×, :, ج, timestamps — ships on every Windows PC
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE_PATH = os.path.join(HERE, ".printed_order_ids.json")
 CAFE_NAME = "Squeeze"
+CAIRO_OFFSET = timedelta(hours=2)   # Africa/Cairo, no DST currently observed
+RECEIPT_WIDTH = 576                 # px, standard 80mm thermal printer raster width @ 203dpi
 
 
 def load_printed_ids():
@@ -74,42 +72,126 @@ def fetch_orders():
     return data.get("orders", [])
 
 
+def format_time_local(raw):
+    """Sheet cells sometimes come back as ISO-UTC ('...T..Z', Sheets auto-typed
+    the cell as a Date) and sometimes as the plain local string we wrote
+    ('YYYY-MM-DD HH:MM:SS') — handle both, always show Cairo local HH:MM."""
+    try:
+        if raw.endswith("Z"):
+            dt = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%S.%fZ") + CAIRO_OFFSET
+        else:
+            dt = datetime.strptime(raw[:19], "%Y-%m-%d %H:%M:%S")
+        return dt.strftime("%H:%M")
+    except Exception:
+        return str(raw)
+
+
 def ar(text):
-    """Thermal printers have no text-shaping engine — unlike WeasyPrint (used for
-    the PDF proposals/reports), raw ESC/POS just prints isolated glyph bytes, so
-    Arabic prints as disconnected letters unless reshaped first. Same fix already
-    used in leads-finder/core/execution/pdf_renderer.py."""
+    """Reshape + bidi-reorder Arabic into final visual draw order."""
     return get_display(arabic_reshaper.reshape(text))
 
 
-def build_receipt_bytes(order):
-    """Use python-escpos's Dummy printer just to build the ESC/POS byte sequence
-    (text formatting, cut command, etc.) without opening any USB/network connection
-    itself — we hand those bytes to Windows' own spooler instead."""
-    p = Dummy()
-    p.set(align="center", bold=True, width=2, height=2)
-    p.text(f"{CAFE_NAME}\n")
-    p.set(align="center", bold=False, width=1, height=1)
-    p.text("-" * 32 + "\n")
-    p.set(align="right", bold=True)
-    p.text(ar(f"ترابيزة {order['table']}") + "\n")
-    p.set(bold=False)
-    p.text(f"{order['time']}\n")
-    p.text("-" * 32 + "\n")
-    p.set(align="right")
-    for line in str(order["items"]).split("، "):
-        p.text(ar(line) + "\n")
-    p.text("-" * 32 + "\n")
-    p.set(bold=True, width=2, height=2)
-    p.text(ar(f"الإجمالي: {order['total']} ج") + "\n")
-    p.set(bold=False, width=1, height=1)
-    p.text("\n")
-    p.cut()
-    return p.output
+def is_arabic_char(ch):
+    o = ord(ch)
+    return (0x0600 <= o <= 0x06FF) or (0xFB50 <= o <= 0xFDFF) or (0xFE70 <= o <= 0xFEFF)
+
+
+def segment_runs(text):
+    """Split already-reordered text into consecutive (is_arabic, substring) runs
+    so each run can be drawn with the font that actually has its glyphs."""
+    runs, cur_type, cur = [], None, ""
+    for ch in text:
+        t = is_arabic_char(ch)
+        if cur_type is None:
+            cur_type, cur = t, ch
+        elif t == cur_type:
+            cur += ch
+        else:
+            runs.append((cur_type, cur))
+            cur_type, cur = t, ch
+    if cur:
+        runs.append((cur_type, cur))
+    return runs
+
+
+def line_width(draw, text, ar_font, latin_font):
+    return sum(
+        draw.textbbox((0, 0), s, font=(ar_font if is_a else latin_font))[2]
+        for is_a, s in segment_runs(text)
+    )
+
+
+def draw_right(draw, right_x, y, text, ar_font, latin_font, fill=0):
+    x = right_x - line_width(draw, text, ar_font, latin_font)
+    for is_a, s in segment_runs(text):
+        f = ar_font if is_a else latin_font
+        draw.text((x, y), s, font=f, fill=fill)
+        x += draw.textbbox((0, 0), s, font=f)[2]
+
+
+def draw_center(draw, center_x, y, text, font, fill=0):
+    w = draw.textbbox((0, 0), text, font=font)[2]
+    draw.text((center_x - w / 2, y), text, font=font, fill=fill)
+
+
+def build_receipt_image(order):
+    pad = 20
+    ar_header = ImageFont.truetype(ARABIC_FONT_PATH, 46)
+    latin_header = ImageFont.truetype(LATIN_FONT_PATH, 46)
+    ar_bold = ImageFont.truetype(ARABIC_FONT_PATH, 30)
+    latin_bold = ImageFont.truetype(LATIN_FONT_PATH, 30)
+    ar_reg = ImageFont.truetype(ARABIC_FONT_PATH, 28)
+    latin_reg = ImageFont.truetype(LATIN_FONT_PATH, 28)
+
+    table_line = ar(f"ترابيزة {order['table']}")
+    time_str = format_time_local(order["time"])
+    item_lines = [ar(x) for x in str(order["items"]).split("، ") if x]
+    total_line = ar(f"الإجمالي: {order['total']} ج")
+
+    line_h_reg, line_h_bold, line_h_header = 40, 44, 60
+    divider_h = 26
+    height = (
+        pad + line_h_header + divider_h
+        + line_h_bold + line_h_reg + divider_h
+        + len(item_lines) * line_h_reg + divider_h
+        + line_h_header + pad
+    )
+
+    img = Image.new("L", (RECEIPT_WIDTH, height), 255)
+    d = ImageDraw.Draw(img)
+    y = pad
+
+    draw_center(d, RECEIPT_WIDTH / 2, y, CAFE_NAME, latin_header)
+    y += line_h_header
+    d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+    y += divider_h
+
+    draw_right(d, RECEIPT_WIDTH - pad, y, table_line, ar_bold, latin_bold)
+    y += line_h_bold
+    draw_right(d, RECEIPT_WIDTH - pad, y, time_str, ar_reg, latin_reg)
+    y += line_h_reg
+    d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+    y += divider_h
+
+    for line in item_lines:
+        draw_right(d, RECEIPT_WIDTH - pad, y, line, ar_reg, latin_reg)
+        y += line_h_reg
+    d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+    y += divider_h
+
+    draw_right(d, RECEIPT_WIDTH - pad, y, total_line, ar_header, latin_header)
+
+    return img
 
 
 def print_order(order):
-    data = build_receipt_bytes(order)
+    img = build_receipt_image(order)
+    p = Dummy()
+    p.image(img)
+    p._raw(b"\n\n")
+    p.cut()
+    data = p.output
+
     hprinter = win32print.OpenPrinter(PRINTER_NAME)
     try:
         win32print.StartDocPrinter(hprinter, 1, ("Waqti order", None, "RAW"))
