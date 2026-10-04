@@ -444,7 +444,15 @@
       const payload = { client: CLIENT, table, items: lines, total, at: new Date().toISOString() };
       const btn = document.getElementById("sendBtn"); btn.disabled = true; btn.textContent = "جاري الإرسال…";
       if (CFG.demo || !CFG.webhook) { console.log("ORDER (demo):", payload); return success(); }
-      fetch(CFG.webhook, { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) })
+      // Content-Type is per-client (webhook_content_type) because it changes CORS behavior:
+      // "application/json" (default, what n8n/Elbob expects) triggers a preflight OPTIONS
+      // request browsers send automatically — n8n handles that fine. Apps Script Web Apps
+      // (clients pointed straight at a /exec URL, no n8n) do NOT handle that preflight and
+      // silently block the POST, so those clients set this to "text/plain;charset=utf-8"
+      // instead — same JSON string body, just a CORS-safelisted header, no preflight sent.
+      // Apps Script's doPost reads e.postData.contents as raw text regardless, so nothing
+      // server-side needs to change either way.
+      fetch(CFG.webhook, { method:"POST", headers:{"Content-Type": CFG.webhook_content_type || "application/json"}, body:JSON.stringify(payload) })
         .then(success)
         .catch(() => { btn.disabled = false; btn.textContent = "ابعت الطلب"; alert("حصل خطأ. حاول تاني أو نادي الجرسون."); });
     }
