@@ -121,6 +121,25 @@ def line_width(draw, text, ar_font, latin_font):
     )
 
 
+def fit_arabic_line(draw, raw_text, max_width, ar_font, latin_font):
+    """Reshape+bidi raw_text, trimming from its logical end (append '…') until it fits
+    max_width. Trims the RAW string (not the already-reordered one) so the cut lands on
+    the sentence's actual end -- trimming a bidi-reordered RTL string from its storage-end
+    would chip away at the sentence's logical START instead. Without this, a long customer
+    note (the note placeholder itself is ~35 chars) can draw past the 80mm receipt's edge
+    and get clipped/overlapped on the printed ticket the kitchen works from."""
+    shaped = ar(raw_text)
+    if line_width(draw, shaped, ar_font, latin_font) <= max_width:
+        return shaped
+    text = raw_text
+    while text:
+        text = text[:-1]
+        shaped = ar(text + "…")
+        if line_width(draw, shaped, ar_font, latin_font) <= max_width:
+            return shaped
+    return "…"
+
+
 def draw_right(draw, right_x, y, text, ar_font, latin_font, fill=0):
     x = right_x - line_width(draw, text, ar_font, latin_font)
     for is_a, s in segment_runs(text):
@@ -143,10 +162,19 @@ def build_receipt_image(order):
     ar_reg = ImageFont.truetype(ARABIC_FONT_PATH, 28)
     latin_reg = ImageFont.truetype(LATIN_FONT_PATH, 28)
 
-    table_line = ar(f"ترابيزة {order['table']}")
+    # Measure/fit against a throwaway 1x1 canvas -- text measurement doesn't need the real
+    # image, and the real image's height depends only on line COUNT (fixed below), never
+    # on measured width, so this has no effect on the layout math that follows.
+    measure = ImageDraw.Draw(Image.new("L", (1, 1)))
+    max_text_width = RECEIPT_WIDTH - 2 * pad
+
+    table_line = fit_arabic_line(measure, f"ترابيزة {order['table']}", max_text_width, ar_bold, latin_bold)
     time_str = format_time_local(order["time"])
-    item_lines = [ar(x) for x in str(order["items"]).split("، ") if x]
-    total_line = ar(f"الإجمالي: {order['total']} ج")
+    item_lines = [
+        fit_arabic_line(measure, x, max_text_width, ar_reg, latin_reg)
+        for x in str(order["items"]).split("، ") if x
+    ]
+    total_line = fit_arabic_line(measure, f"الإجمالي: {order['total']} ج", max_text_width, ar_header, latin_header)
 
     line_h_reg, line_h_bold, line_h_header = 40, 44, 60
     divider_h = 26
@@ -214,12 +242,19 @@ def main():
     while True:
         try:
             orders = fetch_orders()
+            # action=list only ever returns TODAY's orders, so any tracked id no longer in
+            # it belongs to a business day that's gone for good -- drop it. Self-cleans at
+            # every day boundary instead of growing this file forever.
+            before = len(printed)
+            printed &= {o["id"] for o in orders}
+            pruned = len(printed) != before
+
             new_orders = [o for o in orders if o["id"] not in printed and o["status"] != "cancelled"]
             for order in new_orders:
                 print(f"Printing order {order['id']} — table {order['table']}")
                 print_order(order)
                 printed.add(order["id"])
-            if new_orders:
+            if new_orders or pruned:
                 save_printed_ids(printed)
         except Exception as e:
             print(f"[warn] {e} — retrying next cycle")

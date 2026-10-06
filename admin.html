@@ -15,6 +15,8 @@
     }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
     html,body { margin:0; }
+    /* Hidden until the client's real theme is applied -- see index.html for why. */
+    body:not(.ready) { visibility:hidden; }
     body { font-family:'Cairo',sans-serif; background:var(--bg); color:var(--ink); -webkit-font-smoothing:antialiased; }
     .demoflag { background:#ffce5c; color:#5b4300; text-align:center; font-weight:800; font-size:13px; padding:6px; }
     .hero { background:linear-gradient(135deg,var(--blue) 0%,var(--blue-2) 100%); color:#fff;
@@ -56,6 +58,9 @@
     .status-chip.cancelled { background:#fbe5e5; color:var(--cancel); }
     .empty { text-align:center; color:var(--muted); padding:60px 16px; font-weight:600; }
     .refresh-note { text-align:center; color:var(--muted); font-size:12px; padding:10px; }
+    .menu-link { display:block; text-align:center; margin:0 16px 14px; background:var(--card); border:1.5px solid var(--blue);
+      color:var(--blue); text-decoration:none; font-weight:800; font-size:14px; padding:12px; border-radius:14px; }
+    .menu-link:active { transform:scale(.98); }
   </style>
 </head>
 <body>
@@ -77,6 +82,7 @@
       <div class="stat"><b id="statCount">0</b><small>عدد الطلبات</small></div>
       <div class="stat"><b id="statTotal">0</b><small>الإجمالي المتوقع</small></div>
     </div>
+    <a class="menu-link" id="menuLink" href="#" style="display:none">✏️ إدارة المنيو</a>
     <div class="listwrap" id="list"></div>
     <div class="refresh-note" id="refreshNote"></div>
   </div>
@@ -86,8 +92,12 @@
     const CLIENT = params.get("c") || "elbob";
     let CFG = {}, CUR = "ج", LIVE = false, mockOrders = [], POLL = null;
 
+    function reveal() { document.body.classList.add("ready"); }
+    setTimeout(reveal, 2500); // safety net -- never leave the page permanently blank
+
     fetch(`clients/${CLIENT}.json`).then(r => r.json()).then(boot).catch(() => {
       document.getElementById("pinTitle").textContent = "تعذر تحميل الإعدادات";
+      reveal();
     });
 
     function boot(cfg) {
@@ -104,7 +114,13 @@
       document.getElementById("pinTitle").textContent = (cfg.name_ar ? cfg.name_ar.replace(/<[^>]+>/g,'') + " — " : "") + "لوحة الإدارة";
       document.title = "لوحة الإدارة — " + (cfg.name_ar || "وقتي").replace(/<[^>]+>/g,'');
       LIVE = !!cfg.admin_webhook;
+      if (cfg.price_sheet_api) {
+        const link = document.getElementById("menuLink");
+        link.href = `manage.html?c=${encodeURIComponent(CLIENT)}`;
+        link.style.display = "block";
+      }
       document.getElementById("pinInput").addEventListener("keydown", e => { if (e.key === "Enter") tryPin(); });
+      reveal();
     }
 
     function tryPin() {
@@ -137,7 +153,8 @@
     }
     function cancelLive(id) {
       const url = `${CFG.admin_webhook}?action=cancel&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
-      fetch(url).then(r => r.json()).then(() => refreshLive());
+      fetch(url).then(r => r.json()).then(() => refreshLive())
+        .catch(() => alert("تعذر إلغاء الطلب — حاول تاني"));
     }
 
     // ---------- Demo mode (mock data, no backend) ----------

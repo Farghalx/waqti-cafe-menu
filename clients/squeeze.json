@@ -7,11 +7,12 @@
   "webhook_content_type": "text/plain;charset=utf-8",
   "theme": { "blue": "#12AEC4", "blue2": "#0D8AA0", "gold": "#8CC63E", "gold2": "#B7E070", "bg": "#FFF7FA" },
   "_note": "LIVE pilot for Squeeze (drinks + desserts, Mallawi — عاطف بركات بجوار بقيق), orders now really hit the Sheet + print. Prices transcribed from their printed menu photos. Fruit-salad prices weren't legible in the photo — placeholders, confirm with owner. Ice-cream + a couple of sahlab items show two sizes on the menu (printed like '15/20') — mapped here as صغير/كبير, confirm exact labels/order before go-live.",
-  "price_sheet_csv": "https://docs.google.com/spreadsheets/d/1AO1kHsNWcLsDXUuTUcreEz4Ncu4Z63NqV8ONiSzvmbo/export?format=csv&gid=0",
+  "price_sheet_api": "https://script.google.com/macros/s/AKfycbxh3-0tNyirbMBFXuIfpcx_NJkvh0bLBavgcJoGHvEQ2TvA6R_t-bMa-vYn-v0lhoQTgQ/exec",
   "admin_pin": "0304",
   "admin_webhook": "https://script.google.com/macros/s/AKfycbxh3-0tNyirbMBFXuIfpcx_NJkvh0bLBavgcJoGHvEQ2TvA6R_t-bMa-vYn-v0lhoQTgQ/exec",
   "admin_key": "69e947ed5e8b6b8d",
   "_admin_note": "LIVE as of 2026-10-04 — apps_script_v2.gs deployed on the Squeeze Sheet. admin_pin is the last 4 digits of their listed phone (01112030304) — tell the owner to change it.",
+  "_menu_note": "price_sheet_api (added 2026-10-06) replaces price_sheet_csv -- same Apps Script /exec URL as webhook/admin_webhook, now also serving doGet?action=menu (full live menu incl. new items) and doGet?action=menu_set (owner writes from manage.html, PIN-gated via admin.html's new 'إدارة المنيو' link). Requires the apps_script_v2.gs redeploy -- see the Oct 2026 menu-management handoff notes.",
   "categories": [
     {
       "id": "frappe",

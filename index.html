@@ -15,6 +15,11 @@
     }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
     html,body { margin:0; }
+    /* Hidden until the client's real theme is applied -- :root above is Elbob's colors as a
+       fallback default, so painting before boot()/the catch handler runs would flash the
+       wrong cafe's navy/gold for a moment. reveal() (called from both paths, plus a timeout
+       safety net so a stuck fetch can never leave the page permanently blank) unhides it. */
+    body:not(.ready) { visibility:hidden; }
     body { font-family:'Cairo',sans-serif; background:var(--bg); color:var(--ink);
       padding-bottom:108px; -webkit-font-smoothing:antialiased; }
     .hero { background:linear-gradient(135deg,var(--blue) 0%,var(--blue-2) 100%); color:#fff;
@@ -213,6 +218,13 @@
       return rows.filter(r => r.length > 1 || r[0] !== "");
     }
 
+    function validPrice(raw) {
+      // Number("") is 0, not NaN -> a blank price_egp cell must NOT silently become a free item.
+      if (raw == null || String(raw).trim() === "") return null;
+      const n = Number(raw);
+      return isNaN(n) ? null : n;
+    }
+
     function applyPriceOverrides(cfg) {
       if (!cfg.price_sheet_csv) return Promise.resolve(cfg);
       return fetch(cfg.price_sheet_csv).then(r => r.text()).then(text => {
@@ -224,8 +236,8 @@
         rows.forEach(r => {
           if (iActive >= 0 && String(r[iActive]).trim().toUpperCase() === "FALSE") return;
           const key = (r[iId] || "").trim() + "|" + (iVar >= 0 ? (r[iVar] || "").trim() : "");
-          const price = Number(r[iPrice]);
-          if (!isNaN(price)) priceMap[key] = price;
+          const price = validPrice(r[iPrice]);
+          if (price != null) priceMap[key] = price;
         });
         cfg.categories.forEach(cat => cat.items.forEach(it => {
           if (it.variants) {
@@ -242,9 +254,76 @@
       }).catch(() => cfg); // Sheet unreachable -> fall back to JSON prices, never block the menu
     }
 
-    fetch(`clients/${CLIENT}.json`).then(r => r.json()).then(applyPriceOverrides).then(boot).catch(() => {
-      document.getElementById("menu").innerHTML = '<div class="loading">تعذر تحميل القائمة.</div>';
-    });
+    // ---------- Live full menu from the Menu sheet (owner-editable: stock, price, name, +new items) ----------
+    // Opt-in per client via cfg.price_sheet_api (the apps_script_v2.gs /exec URL). Unlike
+    // price_sheet_csv above (price-only override), this can also hide items (active=FALSE)
+    // and insert brand-new items/categories that only exist in the Sheet, added by the owner
+    // from manage.html. JSON stays the structural seed (images, desc, variant shape, order) —
+    // the Sheet only ever supplies what the owner actually edits.
+    function applyMenuSheet(cfg) {
+      return fetch(cfg.price_sheet_api + "?action=menu").then(r => r.json()).then(data => {
+        const rows = (data && data.rows) || [];
+        const byItem = {};
+        rows.forEach(r => {
+          const id = String(r.item_id || "").trim();
+          if (!id) return;
+          (byItem[id] = byItem[id] || []).push(r);
+        });
+
+        const existing = {};
+        cfg.categories.forEach(cat => cat.items.forEach(it => { existing[it.id] = it; }));
+
+        Object.keys(byItem).forEach(id => {
+          const itemRows = byItem[id];
+          // Hide the whole item if ANY of its size/variant rows is inactive — the chip
+          // picker below has no per-variant hiding, so a split state (small in, large out)
+          // must fail toward "hidden," never toward "still orderable in the out size."
+          const active = itemRows.every(r => String(r.active).trim().toUpperCase() !== "FALSE");
+
+          if (existing[id]) {
+            const it = existing[id];
+            it.active = active;
+            if (itemRows[0].name_ar) it.name_ar = itemRows[0].name_ar;
+            if (it.variants) {
+              it.variants.forEach(v => {
+                const row = itemRows.find(r => String(r.variant || "").trim() === v.name);
+                const price = row ? validPrice(row.price_egp) : null;
+                if (price != null) v.price = price;
+              });
+            } else {
+              const row = itemRows.find(r => String(r.variant || "").trim() === "") || itemRows[0];
+              const price = validPrice(row.price_egp);
+              if (price != null) it.price = price;
+            }
+            return;
+          }
+
+          // Brand-new item (added from manage.html) — not in the JSON seed at all.
+          const catName = (itemRows[0].category || "").trim() || "إضافات";
+          let cat = cfg.categories.find(c => c.name_ar === catName || c.id === catName);
+          if (!cat) { cat = { id: catName, name_ar: catName, items: [] }; cfg.categories.push(cat); }
+          const withVariant = itemRows.filter(r => String(r.variant || "").trim() !== "");
+          const newItem = { id, name_ar: itemRows[0].name_ar || id, active };
+          if (withVariant.length) {
+            newItem.variants = withVariant.map(r => ({ name: String(r.variant).trim(), price: validPrice(r.price_egp) || 0 }));
+          } else {
+            newItem.price = validPrice(itemRows[0].price_egp) || 0;
+          }
+          cat.items.push(newItem);
+        });
+        return cfg;
+      }).catch(() => cfg); // Sheet/script unreachable -> fall back to JSON as-is, never block the menu
+    }
+
+    function reveal() { document.body.classList.add("ready"); }
+    setTimeout(reveal, 2500); // safety net -- never leave the page permanently blank
+
+    fetch(`clients/${CLIENT}.json`).then(r => r.json())
+      .then(cfg => cfg.price_sheet_api ? applyMenuSheet(cfg) : applyPriceOverrides(cfg))
+      .then(boot).catch(() => {
+        document.getElementById("menu").innerHTML = '<div class="loading">تعذر تحميل القائمة.</div>';
+        reveal();
+      });
 
     function boot(cfg) {
       CFG = cfg; CUR = cfg.currency || "ج";
@@ -260,6 +339,7 @@
       if (cfg.demo) document.getElementById("demoFlag").style.display = "block";
       document.title = (cfg.name_ar || "وقتي") + " — الطلب";
       render(cfg);
+      reveal();
     }
 
     function render(data) {
@@ -453,7 +533,11 @@
       // Apps Script's doPost reads e.postData.contents as raw text regardless, so nothing
       // server-side needs to change either way.
       fetch(CFG.webhook, { method:"POST", headers:{"Content-Type": CFG.webhook_content_type || "application/json"}, body:JSON.stringify(payload) })
-        .then(success)
+        // Check the response before celebrating — a thrown/failed write on the backend must
+        // not show "order received." r.json() also rejects on Apps Script's HTML error page
+        // for an unhandled exception, so that path is caught too, not just {error:...} bodies.
+        .then(r => r.json())
+        .then(data => { if (data && data.error) throw new Error(data.error); success(); })
         .catch(() => { btn.disabled = false; btn.textContent = "ابعت الطلب"; alert("حصل خطأ. حاول تاني أو نادي الجرسون."); });
     }
     function success() { closeSheets(); document.getElementById("toast").classList.add("show"); }
