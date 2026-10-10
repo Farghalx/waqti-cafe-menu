@@ -319,6 +319,12 @@
     }
 
     // ---------- Orders tab: shared render ----------
+    // o.table and o.items both trace back to customer input (table via the page's own
+    // ?table= URL param, items via the order note's free text) -- escape before innerHTML,
+    // the same way index.html already does for its own cart-note preview. Without this, a
+    // note like "<img src=x onerror=...>" gets stored verbatim in the Orders sheet and
+    // executes here, inside the PIN-gated dashboard, the next time it's opened.
+    const esc = s => String(s).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
     function renderOrders(orders, total, onCancel) {
       const activeCount = orders.filter(o => o.status !== "cancelled").length;
       document.getElementById("statCount").textContent = activeCount;
@@ -331,8 +337,8 @@
         const el = document.createElement("div");
         el.className = "order" + (cancelled ? " cancelled" : "");
         el.innerHTML = `
-          <div class="row1"><span class="tbl">ترابيزة ${o.table}</span><span class="time">${o.time}</span></div>
-          <div class="items">${o.items}</div>
+          <div class="row1"><span class="tbl">ترابيزة ${esc(o.table)}</span><span class="time">${o.time}</span></div>
+          <div class="items">${esc(o.items)}</div>
           <div class="row2">
             <span class="total">${o.total} ${CUR}</span>
             ${cancelled ? '<span class="status-chip cancelled">ملغي</span>' : `<button class="cancel-btn" data-id="${o.id}">إلغاء الطلب</button>`}
