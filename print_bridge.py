@@ -19,6 +19,10 @@ Arabic presentation forms AND plain digits at once.
 Runs on their PC. Polls the same Apps Script endpoint the admin dashboard uses
 (?action=list) for new orders and prints each one on the Xprinter the moment
 it shows up. This only prints — it never touches their existing POS software.
+
+Each order prints TWO copies (2026-10-10): a cashier copy (price per line + grand
+total, for cash reconciliation) and a kitchen copy right after it (same items, NO
+prices anywhere -- what the barista actually works from).
 """
 
 import json
@@ -153,7 +157,35 @@ def draw_center(draw, center_x, y, text, font, fill=0):
     draw.text((center_x - w / 2, y), text, font=font, fill=fill)
 
 
+def parse_items(raw):
+    """Orders since the 2026-10-10 receipts overhaul store `items` as a JSON array
+    (name/qty/price per line) instead of a flattened display string -- lets the cashier
+    copy show a price per line and the kitchen copy show no prices, from the same data.
+    Older orders (pre-dating this change, possibly still sitting in a real Sheet from the
+    pilot period) are the old flattened string -- fall back to one no-price line per
+    '، '-joined fragment rather than crashing on json.loads."""
+    try:
+        parsed = json.loads(raw)
+        if isinstance(parsed, list):
+            return parsed
+    except (ValueError, TypeError):
+        pass
+    return [{"name": x, "qty": None, "price": None} for x in str(raw).split("، ") if x]
+
+
+def _item_line_text(item, with_price):
+    name = str(item.get("name", ""))
+    qty = item.get("qty")
+    price = item.get("price")
+    prefix = f"{qty}× " if qty is not None else ""
+    if with_price and qty is not None and price is not None:
+        return f"{prefix}{name} — {qty * price} ج"
+    return f"{prefix}{name}"
+
+
 def build_receipt_image(order):
+    """Cashier copy: price per line + the grand total -- what she reconciles against the
+    drawer at end of day."""
     pad = 20
     ar_header = ImageFont.truetype(ARABIC_FONT_PATH, 46)
     latin_header = ImageFont.truetype(LATIN_FONT_PATH, 46)
@@ -170,9 +202,10 @@ def build_receipt_image(order):
 
     table_line = fit_arabic_line(measure, f"ترابيزة {order['table']}", max_text_width, ar_bold, latin_bold)
     time_str = format_time_local(order["time"])
+    items = parse_items(order["items"])
     item_lines = [
-        fit_arabic_line(measure, x, max_text_width, ar_reg, latin_reg)
-        for x in str(order["items"]).split("، ") if x
+        fit_arabic_line(measure, _item_line_text(it, True), max_text_width, ar_reg, latin_reg)
+        for it in items
     ]
     total_line = fit_arabic_line(measure, f"الإجمالي: {order['total']} ج", max_text_width, ar_header, latin_header)
 
@@ -212,8 +245,67 @@ def build_receipt_image(order):
     return img
 
 
-def print_order(order):
-    img = build_receipt_image(order)
+def build_kitchen_receipt_image(order):
+    """Kitchen copy: same items, NO prices anywhere -- what the barista actually works
+    from. Printed right after the cashier copy, same printer, every order."""
+    pad = 20
+    ar_header = ImageFont.truetype(ARABIC_FONT_PATH, 46)
+    latin_header = ImageFont.truetype(LATIN_FONT_PATH, 46)
+    ar_bold = ImageFont.truetype(ARABIC_FONT_PATH, 30)
+    latin_bold = ImageFont.truetype(LATIN_FONT_PATH, 30)
+    ar_reg = ImageFont.truetype(ARABIC_FONT_PATH, 28)
+    latin_reg = ImageFont.truetype(LATIN_FONT_PATH, 28)
+
+    measure = ImageDraw.Draw(Image.new("L", (1, 1)))
+    max_text_width = RECEIPT_WIDTH - 2 * pad
+
+    kitchen_label = fit_arabic_line(measure, "نسخة المطبخ", max_text_width, ar_bold, latin_bold)
+    table_line = fit_arabic_line(measure, f"ترابيزة {order['table']}", max_text_width, ar_bold, latin_bold)
+    time_str = format_time_local(order["time"])
+    items = parse_items(order["items"])
+    item_lines = [
+        fit_arabic_line(measure, _item_line_text(it, False), max_text_width, ar_reg, latin_reg)
+        for it in items
+    ]
+
+    line_h_reg, line_h_bold, line_h_header = 40, 44, 60
+    divider_h = 26
+    height = (
+        pad + line_h_header + divider_h
+        + line_h_bold + divider_h
+        + line_h_bold + line_h_reg + divider_h
+        + len(item_lines) * line_h_reg + pad
+    )
+
+    img = Image.new("L", (RECEIPT_WIDTH, height), 255)
+    d = ImageDraw.Draw(img)
+    y = pad
+
+    draw_center(d, RECEIPT_WIDTH / 2, y, CAFE_NAME, latin_header)
+    y += line_h_header
+    d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+    y += divider_h
+
+    draw_right(d, RECEIPT_WIDTH - pad, y, kitchen_label, ar_bold, latin_bold)
+    y += line_h_bold
+    d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+    y += divider_h
+
+    draw_right(d, RECEIPT_WIDTH - pad, y, table_line, ar_bold, latin_bold)
+    y += line_h_bold
+    draw_right(d, RECEIPT_WIDTH - pad, y, time_str, ar_reg, latin_reg)
+    y += line_h_reg
+    d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+    y += divider_h
+
+    for line in item_lines:
+        draw_right(d, RECEIPT_WIDTH - pad, y, line, ar_reg, latin_reg)
+        y += line_h_reg
+
+    return img
+
+
+def _send_to_printer(img):
     p = Dummy()
     p.image(img)
     p._raw(b"\n\n")
@@ -229,6 +321,11 @@ def print_order(order):
         win32print.EndDocPrinter(hprinter)
     finally:
         win32print.ClosePrinter(hprinter)
+
+
+def print_order(order):
+    _send_to_printer(build_receipt_image(order))
+    _send_to_printer(build_kitchen_receipt_image(order))
 
 
 def main():

@@ -52,6 +52,7 @@
     .card .thumb { width:84px; height:84px; flex:0 0 auto; border-radius:13px; object-fit:cover; background:var(--bg); }
     .card .info .name { font-weight:700; font-size:17px; }
     .card .info .price { color:var(--gold); font-size:14px; font-weight:700; margin-top:3px; }
+    .card .info .price s { color:var(--muted); font-weight:500; text-decoration-color:var(--muted); margin-left:4px; }
     .card .info .desc { color:var(--muted); font-size:12.5px; margin-top:2px; line-height:1.5; }
     .is-desc { color:var(--muted); font-size:14px; margin:-6px 0 12px; line-height:1.6; }
     .card .add { width:42px; height:42px; flex:0 0 auto; border-radius:12px; background:var(--blue); color:#fff;
@@ -96,6 +97,8 @@
     .note-input:focus { outline:none; border-color:var(--blue); }
     .note-input::placeholder { color:#b3aa98; }
     .l-note { color:var(--blue); font-size:13px; font-weight:600; margin-top:3px; }
+    .capture-hint { color:var(--muted); font-size:12.5px; font-weight:600; margin:14px 0 6px; }
+    .capture-input { margin-top:8px; }
     .qtyrow { display:flex; align-items:center; justify-content:space-between; margin-top:18px; }
     .stepper { display:flex; align-items:center; gap:16px; }
     .stepper button { width:44px; height:44px; border-radius:12px; border:none; font-size:24px; font-weight:800;
@@ -172,6 +175,9 @@
     <div class="title">طلبك</div>
     <div id="cartLines" style="margin-top:10px"></div>
     <div class="cart-total"><span>الإجمالي</span><b id="cartTotal">0</b></div>
+    <div class="capture-hint">🎁 سيبي اسمك ورقمك (اختياري) وهتاخدي هدية أو عرض قريبًا</div>
+    <input class="note-input capture-input" id="custName" placeholder="الاسم (اختياري)" />
+    <input class="note-input capture-input" id="custPhone" placeholder="رقم الموبايل (اختياري)" inputmode="tel" />
     <button class="addbtn" id="sendBtn" onclick="sendOrder()">ابعت الطلب</button>
   </div>
 
@@ -260,6 +266,15 @@
     // and insert brand-new items/categories that only exist in the Sheet, added by the owner
     // from manage.html. JSON stays the structural seed (images, desc, variant shape, order) —
     // the Sheet only ever supplies what the owner actually edits.
+    // A row is "on offer" only when the owner has both configured a discount price AND
+    // flipped the manual toggle on -- sale_price_egp can stay set while on_offer is off
+    // (same pattern as stock: she doesn't lose the discount price just by toggling it off).
+    function rowOffer(row) {
+      const onOffer = String(row.on_offer || "").trim().toUpperCase() === "TRUE";
+      const salePrice = validPrice(row.sale_price_egp);
+      return (onOffer && salePrice != null) ? salePrice : null;
+    }
+
     function applyMenuSheet(cfg) {
       return fetch(cfg.price_sheet_api + "?action=menu").then(r => r.json()).then(data => {
         const rows = (data && data.rows) || [];
@@ -287,13 +302,22 @@
             if (it.variants) {
               it.variants.forEach(v => {
                 const row = itemRows.find(r => String(r.variant || "").trim() === v.name);
-                const price = row ? validPrice(row.price_egp) : null;
+                if (!row) return;
+                const price = validPrice(row.price_egp);
+                const original = price != null ? price : v.price;
                 if (price != null) v.price = price;
+                const sale = rowOffer(row);
+                if (sale != null) { v.originalPrice = original; v.price = sale; v.onOffer = true; }
+                else { v.onOffer = false; }
               });
             } else {
               const row = itemRows.find(r => String(r.variant || "").trim() === "") || itemRows[0];
               const price = validPrice(row.price_egp);
+              const original = price != null ? price : it.price;
               if (price != null) it.price = price;
+              const sale = rowOffer(row);
+              if (sale != null) { it.originalPrice = original; it.price = sale; it.onOffer = true; }
+              else { it.onOffer = false; }
             }
             return;
           }
@@ -305,9 +329,19 @@
           const withVariant = itemRows.filter(r => String(r.variant || "").trim() !== "");
           const newItem = { id, name_ar: itemRows[0].name_ar || id, active };
           if (withVariant.length) {
-            newItem.variants = withVariant.map(r => ({ name: String(r.variant).trim(), price: validPrice(r.price_egp) || 0 }));
+            newItem.variants = withVariant.map(r => {
+              const price = validPrice(r.price_egp) || 0;
+              const sale = rowOffer(r);
+              return sale != null
+                ? { name: String(r.variant).trim(), price: sale, originalPrice: price, onOffer: true }
+                : { name: String(r.variant).trim(), price, onOffer: false };
+            });
           } else {
-            newItem.price = validPrice(itemRows[0].price_egp) || 0;
+            const row = itemRows[0];
+            const price = validPrice(row.price_egp) || 0;
+            const sale = rowOffer(row);
+            if (sale != null) { newItem.price = sale; newItem.originalPrice = price; newItem.onOffer = true; }
+            else { newItem.price = price; newItem.onOffer = false; }
           }
           cat.items.push(newItem);
         });
@@ -357,8 +391,11 @@
           items[it.id] = { name: it.name_ar, price: (it.price != null ? it.price : null),
             variants: it.variants || null, sugar: it.sugar || null, image: it.image || null, desc: it.desc || null };
           const pl = it.variants
-            ? ("من " + Math.min.apply(null, it.variants.map(function (v) { return v.price; })) + " " + CUR)
-            : (it.price + " " + CUR);
+            ? ((it.variants.some(function (v) { return v.onOffer; }) ? "🏷️ " : "")
+               + "من " + Math.min.apply(null, it.variants.map(function (v) { return v.price; })) + " " + CUR)
+            : it.onOffer
+              ? (`<s>${it.originalPrice} ${CUR}</s> ${it.price} ${CUR} 🏷️`)
+              : (it.price + " " + CUR);
           const card = document.createElement("div");
           card.className = "card"; card.onclick = () => openItem(it.id);
           card.innerHTML = `
@@ -521,7 +558,15 @@
         return { name, qty: l.qty, price: l.price };
       });
       const total = cart.reduce((s,l)=>s+l.price*l.qty,0);
-      const payload = { client: CLIENT, table, items: lines, total, at: new Date().toISOString() };
+      // Optional name/phone capture, purely for a future gift/offer -- never required to
+      // place an order. Apps Script stores them in a separate "Customers" tab only if at
+      // least one is filled in.
+      const custName = (document.getElementById("custName").value || "").trim();
+      const custPhone = (document.getElementById("custPhone").value || "").trim();
+      const payload = {
+        client: CLIENT, table, items: lines, total, at: new Date().toISOString(),
+        customer_name: custName, customer_phone: custPhone,
+      };
       const btn = document.getElementById("sendBtn"); btn.disabled = true; btn.textContent = "جاري الإرسال…";
       if (CFG.demo || !CFG.webhook) { console.log("ORDER (demo):", payload); return success(); }
       // Content-Type is per-client (webhook_content_type) because it changes CORS behavior:
@@ -542,6 +587,7 @@
     }
     function success() { closeSheets(); document.getElementById("toast").classList.add("show"); }
     function resetAll() { cart = []; refresh(); document.getElementById("toast").classList.remove("show");
+      document.getElementById("custName").value = ""; document.getElementById("custPhone").value = "";
       const b = document.getElementById("sendBtn"); b.disabled = false; b.textContent = "ابعت الطلب"; }
   </script>
 </body>

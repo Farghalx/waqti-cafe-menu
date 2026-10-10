@@ -123,7 +123,7 @@
       "items": [
         { "id": "mj_blue", "name_ar": "موهيتو أزرق", "price": 55 },
         { "id": "mj_mint", "name_ar": "موهيتو نعناع", "price": 55 },
-        { "id": "mj_strawberry", "name_ar": "موهيتو فراولة", "price": 55 },
+        { "id": "mj_strawberry", "name_ar": "موهيتو فراولة", "price": 55, "image": "img/ai-mojito-strawberry.jpg" },
         { "id": "mj_blueberry", "name_ar": "موهيتو بلوبيري", "price": 55 },
         { "id": "mj_passion", "name_ar": "موهيتو باشن فروت", "price": 55 },
         { "id": "mj_redbull", "name_ar": "ريدبول موهيتو", "price": 80 },
@@ -145,7 +145,7 @@
       "id": "crepe",
       "name_ar": "كريب",
       "items": [
-        { "id": "cr_choco", "name_ar": "كريب شوكولت", "price": 50 },
+        { "id": "cr_choco", "name_ar": "كريب شوكولت", "price": 50, "image": "img/ai-crepe-banana-nutella.jpg" },
         { "id": "cr_oreo", "name_ar": "كريب أوريو", "price": 60 },
         { "id": "cr_strawberry", "name_ar": "كريب فروله", "price": 60 },
         { "id": "cr_blueberry", "name_ar": "كريب بلوبيري", "price": 60 },

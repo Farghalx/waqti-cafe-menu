@@ -84,10 +84,12 @@
     .minfo { min-width:0; }
     .mname { font-weight:700; font-size:16px; }
     .mprice { color:var(--gold); font-size:13px; font-weight:700; margin-top:3px; }
+    .mprice s { color:var(--muted); font-weight:500; text-decoration-color:var(--muted); margin-left:4px; }
     .mactions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
-    .medit { width:36px; height:36px; border-radius:10px; border:1px solid var(--line); background:#fff; font-size:16px;
+    .medit, .moffer { width:36px; height:36px; border-radius:10px; border:1px solid var(--line); background:#fff; font-size:16px;
       display:grid; place-items:center; cursor:pointer; }
-    .medit:active { transform:scale(.92); }
+    .medit:active, .moffer:active { transform:scale(.92); }
+    .moffer.on { background:var(--gold); border-color:var(--gold); }
     .mstock { border:none; border-radius:999px; padding:9px 14px; font-family:inherit; font-weight:800; font-size:13px;
       cursor:pointer; white-space:nowrap; color:#fff; min-width:64px; }
     .mstock.on { background:var(--ok); }
@@ -325,6 +327,22 @@
     // note like "<img src=x onerror=...>" gets stored verbatim in the Orders sheet and
     // executes here, inside the PIN-gated dashboard, the next time it's opened.
     const esc = s => String(s).replace(/[<>&]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+
+    // Orders written since the 2026-10-10 receipts overhaul store `items` as a JSON array
+    // (name/qty/price per line) instead of a flattened display string -- lets the owner see
+    // a price per line here too, same as the printed cashier copy. Orders from before that
+    // (still sitting in the real Sheet from the pilot period) are a plain string -- fall
+    // back to showing that as-is rather than crashing on JSON.parse.
+    function itemsLabel(raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.map(i => `${esc(i.qty)}× ${esc(i.name)} — ${esc(i.price * i.qty)} ${CUR}`).join("<br>");
+        }
+      } catch (e) {}
+      return esc(raw); // legacy plain-string order, pre-dating the JSON format
+    }
+
     function renderOrders(orders, total, onCancel) {
       const activeCount = orders.filter(o => o.status !== "cancelled").length;
       document.getElementById("statCount").textContent = activeCount;
@@ -338,7 +356,7 @@
         el.className = "order" + (cancelled ? " cancelled" : "");
         el.innerHTML = `
           <div class="row1"><span class="tbl">ترابيزة ${esc(o.table)}</span><span class="time">${o.time}</span></div>
-          <div class="items">${esc(o.items)}</div>
+          <div class="items">${itemsLabel(o.items)}</div>
           <div class="row2">
             <span class="total">${o.total} ${CUR}</span>
             ${cancelled ? '<span class="status-chip cancelled">ملغي</span>' : `<button class="cancel-btn" data-id="${o.id}">إلغاء الطلب</button>`}
@@ -377,17 +395,39 @@
         const active = itemRows.every(r => String(r.active).trim().toUpperCase() !== "FALSE");
         const variantRows = itemRows.filter(r => String(r.variant || "").trim() !== "");
         const flatRow = itemRows.find(r => String(r.variant || "").trim() === "") || itemRows[0];
+        const offerFields = (r) => ({
+          salePrice: (r.sale_price_egp === "" || r.sale_price_egp == null) ? null : Number(r.sale_price_egp),
+          onOffer: String(r.on_offer || "").trim().toUpperCase() === "TRUE",
+        });
         return {
           id, category, name_ar: itemRows[0].name_ar, active,
-          variants: variantRows.length ? variantRows.map(r => ({ name: String(r.variant).trim(), price: Number(r.price_egp) })) : null,
+          variants: variantRows.length
+            ? variantRows.map(r => ({ name: String(r.variant).trim(), price: Number(r.price_egp), ...offerFields(r) }))
+            : null,
           price: variantRows.length ? null : Number(flatRow.price_egp),
+          ...(variantRows.length ? {} : offerFields(flatRow)),
         };
       });
       return { items, catOrder };
     }
 
+    // "On offer" means EVERY row has both a configured discount price and the toggle on --
+    // a multi-variant item toggles both sizes together (same pattern as the stock pill), so
+    // a half-on state should never actually happen, but checking "every" rather than "some"
+    // means the badge never claims a deal that isn't fully active on all sizes.
+    function offerOn(it) {
+      return it.variants ? it.variants.every(v => v.onOffer) : !!it.onOffer;
+    }
+    function offerConfigured(it) {
+      return it.variants ? it.variants.every(v => v.salePrice != null) : it.salePrice != null;
+    }
+
     function priceLabel(it) {
-      if (it.variants) return it.variants.map(v => `${v.name} ${v.price}`).join(" · ") + " " + CUR;
+      if (it.variants) {
+        const label = it.variants.map(v => `${v.name} ${offerOn(v) ? v.salePrice : v.price}`).join(" · ") + " " + CUR;
+        return (offerOn(it) ? "🏷️ " : "") + label;
+      }
+      if (offerOn(it)) return `<s>${it.price}</s> ${it.salePrice} ${CUR} 🏷️`;
       return it.price + " " + CUR;
     }
 
@@ -420,12 +460,40 @@
           <div class="mprice">${priceLabel(it)}</div>
         </div>
         <div class="mactions">
+          <button class="moffer ${offerOn(it) ? "on" : ""}" title="عرض">🏷️</button>
           <button class="medit" title="تعديل">✏️</button>
           <button class="mstock ${it.active ? "on" : "off"}" ${it._busy ? "disabled" : ""}>${it._busy ? "…" : (it.active ? "متوفر" : "خلصت")}</button>
         </div>`;
+      card.querySelector(".moffer").onclick = () => toggleOffer(it.id);
       card.querySelector(".medit").onclick = () => openEdit(it.id);
       card.querySelector(".mstock").onclick = () => toggleStock(it.id);
       return card;
+    }
+
+    // Tapping the offer pill: if no discount price is configured yet, open the edit sheet
+    // so she can set one (saving it there turns the offer on automatically -- see saveEdit).
+    // If a price IS already configured, this is a plain on/off toggle, same pattern as stock.
+    function toggleOffer(id) {
+      const it = state.items.find(i => i.id === id);
+      if (!it || it._busy) return;
+      if (!offerConfigured(it)) { openEdit(id); return; }
+      const newOn = !offerOn(it);
+      it._busy = true; renderMenu();
+      const writes = rowsForItem(it).map(r => {
+        const sale = it.variants ? it.variants.find(v => v.name === r.variant).salePrice : it.salePrice;
+        return menuSet({
+          item_id: id, category: it.category, name_ar: it.name_ar,
+          variant: r.variant, price_egp: r.price, active: String(it.active),
+          sale_price_egp: sale, on_offer: String(newOn),
+        });
+      });
+      Promise.all(writes).then(results => {
+        if (results.every(r => r && r.ok)) {
+          if (it.variants) it.variants.forEach(v => { v.onOffer = newOn; });
+          else it.onOffer = newOn;
+        } else alert("حصل خطأ — حاول تاني");
+      }).catch(() => alert("تعذر الاتصال — حاول تاني"))
+        .finally(() => { it._busy = false; renderMenu(); });
     }
 
     function rowsForItem(it) {
@@ -445,10 +513,17 @@
       if (!it || it._busy) return;
       const newActive = !it.active;
       it._busy = true; renderMenu();
-      const writes = rowsForItem(it).map(r => menuSet({
-        item_id: id, category: it.category, name_ar: it.name_ar,
-        variant: r.variant, price_egp: r.price, active: String(newActive),
-      }));
+      // menuSet upserts the WHOLE row server-side, not a partial patch -- any configured
+      // offer (sale_price_egp/on_offer) must be resent here too, or toggling stock would
+      // silently wipe it.
+      const writes = rowsForItem(it).map(r => {
+        const v = it.variants ? it.variants.find(x => x.name === r.variant) : it;
+        return menuSet({
+          item_id: id, category: it.category, name_ar: it.name_ar,
+          variant: r.variant, price_egp: r.price, active: String(newActive),
+          sale_price_egp: v.salePrice == null ? '' : v.salePrice, on_offer: String(!!v.onOffer),
+        });
+      });
       Promise.all(writes).then(results => {
         if (results.every(r => r && r.ok)) it.active = newActive;
         else alert("حصل خطأ — حاول تاني");
@@ -456,7 +531,8 @@
         .finally(() => { it._busy = false; renderMenu(); });
     }
 
-    // ---------- Edit existing item (name + price only -- not variant labels/sizes) ----------
+    // ---------- Edit existing item (name + price + optional discount price -- not variant
+    // labels/sizes) ----------
     function openEdit(id) {
       editingId = id;
       const it = state.items.find(i => i.id === id);
@@ -468,9 +544,17 @@
           row.className = "field";
           row.innerHTML = `<label>السعر — ${v.name}</label><input type="number" inputmode="decimal" class="edit-variant-price" data-name="${v.name}" value="${v.price}" />`;
           box.appendChild(row);
+          const saleRow = document.createElement("div");
+          saleRow.className = "field";
+          saleRow.innerHTML = `<label>سعر العرض — ${v.name} (اختياري)</label>
+            <input type="number" inputmode="decimal" class="edit-variant-sale" data-name="${v.name}" value="${v.salePrice != null ? v.salePrice : ''}" placeholder="سيبه فاضي لو مفيش عرض" />`;
+          box.appendChild(saleRow);
         });
       } else {
-        box.innerHTML = `<div class="field"><label>السعر</label><input type="number" inputmode="decimal" id="editFlatPrice" value="${it.price}" /></div>`;
+        box.innerHTML = `
+          <div class="field"><label>السعر</label><input type="number" inputmode="decimal" id="editFlatPrice" value="${it.price}" /></div>
+          <div class="field"><label>سعر العرض (اختياري)</label>
+            <input type="number" inputmode="decimal" id="editFlatSale" value="${it.salePrice != null ? it.salePrice : ''}" placeholder="سيبه فاضي لو مفيش عرض" /></div>`;
       }
       openSheet("editSheet");
     }
@@ -481,31 +565,53 @@
       const name = document.getElementById("editName").value.trim();
       if (!name) { alert("اكتب اسم الصنف"); return; }
 
+      // salePrice null = no discount configured for that row. Validated the same as the
+      // regular price when present, but it's always optional.
       let rows;
       if (it.variants) {
         rows = []; let bad = false;
         document.querySelectorAll(".edit-variant-price").forEach(inp => {
           const price = Number(inp.value);
           if (inp.value === "" || isNaN(price) || price < 0) bad = true;
-          rows.push({ variant: inp.dataset.name, price });
+          const saleInp = document.querySelector(`.edit-variant-sale[data-name="${inp.dataset.name}"]`);
+          const saleRaw = (saleInp ? saleInp.value : "").trim();
+          const salePrice = saleRaw === "" ? null : Number(saleRaw);
+          if (salePrice != null && (isNaN(salePrice) || salePrice < 0)) bad = true;
+          rows.push({ variant: inp.dataset.name, price, salePrice });
         });
         if (bad) { alert("تأكد إن كل الأسعار أرقام صح"); return; }
       } else {
         const raw = document.getElementById("editFlatPrice").value;
         const price = Number(raw);
         if (raw === "" || isNaN(price) || price < 0) { alert("السعر لازم يكون رقم"); return; }
-        rows = [{ variant: "", price }];
+        const saleRaw = document.getElementById("editFlatSale").value.trim();
+        const salePrice = saleRaw === "" ? null : Number(saleRaw);
+        if (salePrice != null && (isNaN(salePrice) || salePrice < 0)) { alert("سعر العرض لازم يكون رقم"); return; }
+        rows = [{ variant: "", price, salePrice }];
       }
+
+      // on_offer isn't touched by a normal edit -- UNLESS the discount price just got set
+      // for the very first time (she clearly wants it active right away, same as tapping
+      // the offer pill immediately after), or just got cleared back to empty (can't stay
+      // "on offer" with no price).
+      const hadPriceBefore = offerConfigured(it);
+      const hasPriceNow = rows.every(r => r.salePrice != null);
+      const wasOn = offerOn(it);
+      const newOn = !hasPriceNow ? false : (!hadPriceBefore ? true : wasOn);
 
       const btn = document.getElementById("editSave"); btn.disabled = true; btn.textContent = "جاري الحفظ…";
       Promise.all(rows.map(r => menuSet({
         item_id: it.id, category: it.category, name_ar: name,
         variant: r.variant, price_egp: r.price, active: String(it.active),
+        sale_price_egp: r.salePrice == null ? '' : r.salePrice, on_offer: String(newOn),
       }))).then(results => {
         if (!results.every(r => r && r.ok)) throw new Error("save_failed");
         it.name_ar = name;
-        if (it.variants) it.variants.forEach(v => { const r = rows.find(x => x.variant === v.name); if (r) v.price = r.price; });
-        else it.price = rows[0].price;
+        if (it.variants) it.variants.forEach(v => {
+          const r = rows.find(x => x.variant === v.name);
+          if (r) { v.price = r.price; v.salePrice = r.salePrice; v.onOffer = newOn; }
+        });
+        else { it.price = rows[0].price; it.salePrice = rows[0].salePrice; it.onOffer = newOn; }
         closeSheets(); renderMenu();
       }).catch(() => alert("حصل خطأ في الحفظ — حاول تاني"))
         .finally(() => { btn.disabled = false; btn.textContent = "حفظ"; });
