@@ -175,9 +175,11 @@
     <div class="title">طلبك</div>
     <div id="cartLines" style="margin-top:10px"></div>
     <div class="cart-total"><span>الإجمالي</span><b id="cartTotal">0</b></div>
-    <div class="capture-hint">🎁 سيبي اسمك ورقمك (اختياري) وهتاخدي هدية أو عرض قريبًا</div>
-    <input class="note-input capture-input" id="custName" placeholder="الاسم (اختياري)" />
-    <input class="note-input capture-input" id="custPhone" placeholder="رقم الموبايل (اختياري)" inputmode="tel" />
+    <div id="captureSection" style="display:none">
+      <div class="capture-hint">🎁 سيبي اسمك ورقمك (اختياري) وهتاخدي هدية أو عرض قريبًا</div>
+      <input class="note-input capture-input" id="custName" placeholder="الاسم (اختياري)" />
+      <input class="note-input capture-input" id="custPhone" placeholder="رقم الموبايل (اختياري)" inputmode="tel" />
+    </div>
     <button class="addbtn" id="sendBtn" onclick="sendOrder()">ابعت الطلب</button>
   </div>
 
@@ -373,7 +375,23 @@
       if (cfg.demo) document.getElementById("demoFlag").style.display = "block";
       document.title = (cfg.name_ar || "وقتي") + " — الطلب";
       render(cfg);
+      showCaptureIfFirstScan();
       reveal();
+    }
+
+    // Name/phone capture (gift/offer hook) shows only on this device's first-ever scan of
+    // this cafe's menu -- never again after that, whether or not they actually filled it in,
+    // so a returning customer isn't asked on every single order. localStorage can throw in
+    // private-browsing/blocked-storage contexts; fail toward showing it once rather than
+    // breaking order flow either way.
+    function showCaptureIfFirstScan() {
+      const key = "waqti_seen_capture_" + CLIENT;
+      let seen = false;
+      try { seen = !!localStorage.getItem(key); } catch (e) {}
+      if (!seen) {
+        document.getElementById("captureSection").style.display = "block";
+        try { localStorage.setItem(key, "1"); } catch (e) {}
+      }
     }
 
     function render(data) {
