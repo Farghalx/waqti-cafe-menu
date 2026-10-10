@@ -18,7 +18,11 @@ setlocal
 set TASK_NAME=WaqtiPrintBridge
 set SCRIPT_DIR=%~dp0
 
-schtasks /create /tn "%TASK_NAME%" /tr "\"%SCRIPT_DIR%print_bridge_run.bat\"" /sc onlogon /rl highest /f
+REM No /rl highest -- running elevated/admin can resolve PATH differently than the normal
+REM interactive login (this caused python3.12.exe to fail with 0xc0000142 on the real cafe
+REM PC: worked fine double-clicked, broke under the elevated scheduled task). Printing
+REM through a Windows print queue doesn't need admin rights anyway.
+schtasks /create /tn "%TASK_NAME%" /tr "\"%SCRIPT_DIR%print_bridge_run.bat\"" /sc onlogon /f
 
 echo.
 echo Installed task "%TASK_NAME%" -- it will now start automatically at every logon on this PC.

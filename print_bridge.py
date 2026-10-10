@@ -76,18 +76,27 @@ def fetch_orders():
     return data.get("orders", [])
 
 
-def format_time_local(raw):
+def _local_datetime(raw):
     """Sheet cells sometimes come back as ISO-UTC ('...T..Z', Sheets auto-typed
     the cell as a Date) and sometimes as the plain local string we wrote
-    ('YYYY-MM-DD HH:MM:SS') — handle both, always show Cairo local HH:MM."""
+    ('YYYY-MM-DD HH:MM:SS') — handle both, always return Cairo local time."""
+    if raw.endswith("Z"):
+        return datetime.strptime(raw, "%Y-%m-%dT%H:%M:%S.%fZ") + CAIRO_OFFSET
+    return datetime.strptime(raw[:19], "%Y-%m-%d %H:%M:%S")
+
+
+def format_time_local(raw):
     try:
-        if raw.endswith("Z"):
-            dt = datetime.strptime(raw, "%Y-%m-%dT%H:%M:%S.%fZ") + CAIRO_OFFSET
-        else:
-            dt = datetime.strptime(raw[:19], "%Y-%m-%d %H:%M:%S")
-        return dt.strftime("%H:%M")
+        return _local_datetime(raw).strftime("%H:%M")
     except Exception:
         return str(raw)
+
+
+def format_date_local(raw):
+    try:
+        return _local_datetime(raw).strftime("%d/%m/%Y")
+    except Exception:
+        return ""
 
 
 def ar(text):
@@ -183,9 +192,11 @@ def _item_line_text(item, with_price):
     return f"{prefix}{name}"
 
 
-def build_receipt_image(order):
+def build_receipt_image(order, order_number):
     """Cashier copy: price per line + the grand total -- what she reconciles against the
-    drawer at end of day."""
+    drawer at end of day. order_number is this order's 1-based position in TODAY's order
+    list (resets every business day) -- a short, speakable reference ("order 7"), not the
+    internal random order id."""
     pad = 20
     ar_header = ImageFont.truetype(ARABIC_FONT_PATH, 46)
     latin_header = ImageFont.truetype(LATIN_FONT_PATH, 46)
@@ -201,7 +212,8 @@ def build_receipt_image(order):
     max_text_width = RECEIPT_WIDTH - 2 * pad
 
     table_line = fit_arabic_line(measure, f"ترابيزة {order['table']}", max_text_width, ar_bold, latin_bold)
-    time_str = format_time_local(order["time"])
+    datetime_str = f"{format_date_local(order['time'])} {format_time_local(order['time'])}"
+    order_no_line = ar(f"طلب رقم {order_number}")
     items = parse_items(order["items"])
     item_lines = [
         fit_arabic_line(measure, _item_line_text(it, True), max_text_width, ar_reg, latin_reg)
@@ -213,7 +225,7 @@ def build_receipt_image(order):
     divider_h = 26
     height = (
         pad + line_h_header + divider_h
-        + line_h_bold + line_h_reg + divider_h
+        + line_h_bold + line_h_reg + line_h_reg + divider_h
         + len(item_lines) * line_h_reg + divider_h
         + line_h_header + pad
     )
@@ -229,7 +241,9 @@ def build_receipt_image(order):
 
     draw_right(d, RECEIPT_WIDTH - pad, y, table_line, ar_bold, latin_bold)
     y += line_h_bold
-    draw_right(d, RECEIPT_WIDTH - pad, y, time_str, ar_reg, latin_reg)
+    draw_right(d, RECEIPT_WIDTH - pad, y, datetime_str, ar_reg, latin_reg)
+    y += line_h_reg
+    draw_right(d, RECEIPT_WIDTH - pad, y, order_no_line, ar_reg, latin_reg)
     y += line_h_reg
     d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
     y += divider_h
@@ -245,7 +259,7 @@ def build_receipt_image(order):
     return img
 
 
-def build_kitchen_receipt_image(order):
+def build_kitchen_receipt_image(order, order_number):
     """Kitchen copy: same items, NO prices anywhere -- what the barista actually works
     from. Printed right after the cashier copy, same printer, every order."""
     pad = 20
@@ -261,7 +275,8 @@ def build_kitchen_receipt_image(order):
 
     kitchen_label = fit_arabic_line(measure, "نسخة المطبخ", max_text_width, ar_bold, latin_bold)
     table_line = fit_arabic_line(measure, f"ترابيزة {order['table']}", max_text_width, ar_bold, latin_bold)
-    time_str = format_time_local(order["time"])
+    datetime_str = f"{format_date_local(order['time'])} {format_time_local(order['time'])}"
+    order_no_line = ar(f"طلب رقم {order_number}")
     items = parse_items(order["items"])
     item_lines = [
         fit_arabic_line(measure, _item_line_text(it, False), max_text_width, ar_reg, latin_reg)
@@ -273,7 +288,7 @@ def build_kitchen_receipt_image(order):
     height = (
         pad + line_h_header + divider_h
         + line_h_bold + divider_h
-        + line_h_bold + line_h_reg + divider_h
+        + line_h_bold + line_h_reg + line_h_reg + divider_h
         + len(item_lines) * line_h_reg + pad
     )
 
@@ -293,7 +308,9 @@ def build_kitchen_receipt_image(order):
 
     draw_right(d, RECEIPT_WIDTH - pad, y, table_line, ar_bold, latin_bold)
     y += line_h_bold
-    draw_right(d, RECEIPT_WIDTH - pad, y, time_str, ar_reg, latin_reg)
+    draw_right(d, RECEIPT_WIDTH - pad, y, datetime_str, ar_reg, latin_reg)
+    y += line_h_reg
+    draw_right(d, RECEIPT_WIDTH - pad, y, order_no_line, ar_reg, latin_reg)
     y += line_h_reg
     d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
     y += divider_h
@@ -323,9 +340,9 @@ def _send_to_printer(img):
         win32print.ClosePrinter(hprinter)
 
 
-def print_order(order):
-    _send_to_printer(build_receipt_image(order))
-    _send_to_printer(build_kitchen_receipt_image(order))
+def print_order(order, order_number):
+    _send_to_printer(build_receipt_image(order, order_number))
+    _send_to_printer(build_kitchen_receipt_image(order, order_number))
 
 
 def main():
@@ -346,10 +363,17 @@ def main():
             printed &= {o["id"] for o in orders}
             pruned = len(printed) != before
 
-            new_orders = [o for o in orders if o["id"] not in printed and o["status"] != "cancelled"]
-            for order in new_orders:
-                print(f"Printing order {order['id']} — table {order['table']}")
-                print_order(order)
+            # order_number = this order's 1-based position in TODAY's full list (action=list
+            # is always insertion-order for the business day) -- a stable, speakable "order
+            # N" that resets every business day, independent of which orders get printed in
+            # which batch or cancelled along the way.
+            new_orders = [
+                (i, o) for i, o in enumerate(orders, start=1)
+                if o["id"] not in printed and o["status"] != "cancelled"
+            ]
+            for order_number, order in new_orders:
+                print(f"Printing order {order['id']} — table {order['table']} (#{order_number})")
+                print_order(order, order_number)
                 printed.add(order["id"])
             if new_orders or pruned:
                 save_printed_ids(printed)
