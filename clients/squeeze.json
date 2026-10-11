@@ -12,6 +12,8 @@
   "admin_webhook": "https://script.google.com/macros/s/AKfycbxh3-0tNyirbMBFXuIfpcx_NJkvh0bLBavgcJoGHvEQ2TvA6R_t-bMa-vYn-v0lhoQTgQ/exec",
   "admin_key": "69e947ed5e8b6b8d",
   "_admin_note": "LIVE as of 2026-10-04 — apps_script_v2.gs deployed on the Squeeze Sheet. admin_pin is the last 4 digits of their listed phone (01112030304) — tell the owner to change it.",
+  "features": { "expenses": true },
+  "_features_note": "expenses (added 2026-10-11) gates the المصروفات tab + تقفيل print button in admin.html, since those are shared across every client -- do NOT flip this on for Elbob/Khyma/demo until their own Apps Script deployment has the Expenses/ReportQueue tabs and actions too. LIVE as of 2026-10-11 -- Expenses/ReportQueue tabs created on the real Sheet, apps_script_v2.gs redeployed with the matching ADMIN_KEY, both smoke-tested against the real webhook before this flag shipped (see SQUEEZE_HANDOFF.md).",
   "_menu_note": "price_sheet_api (added 2026-10-06) replaces price_sheet_csv -- same Apps Script /exec URL as webhook/admin_webhook, now also serving doGet?action=menu (full live menu incl. new items) and doGet?action=menu_set (owner writes from manage.html, PIN-gated via admin.html's new 'إدارة المنيو' link). Requires the apps_script_v2.gs redeploy -- see the Oct 2026 menu-management handoff notes.",
   "categories": [
     {
