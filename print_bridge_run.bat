@@ -8,16 +8,16 @@ REM of leaving the cafe with no printing until someone notices and reruns this b
 REM Output goes to print_bridge.log next to this file, not a console window, so there's a
 REM record to check later instead of errors scrolling past in a window nobody's watching.
 
-REM Calling python.exe by its FULL PATH, not just "python" -- on this cafe PC, "python" on
-REM PATH resolves to the Microsoft Store app-execution-alias stub
-REM (...\AppData\Local\Microsoft\WindowsApps\python.exe), which works fine double-clicked
-REM or run from an interactive terminal but is known to fail (0xc0000142) when launched by
-REM Task Scheduler or any other non-interactive/background launcher -- it needs the normal
-REM interactive shell activation that alias relies on. Calling it by full path sidesteps
-REM nothing about THAT specific flakiness (still the same stub), so if this still crashes
-REM under the scheduled task, the real fix is installing actual Python from python.org and
-REM pointing this at THAT python.exe instead -- see the handoff notes.
-set PYTHON_EXE=%LOCALAPPDATA%\Microsoft\WindowsApps\python.exe
+REM Calling python.exe by its FULL PATH, not just "python" -- the Microsoft Store
+REM app-execution-alias stub (...\AppData\Local\Microsoft\WindowsApps\python.exe) works fine
+REM double-clicked or run from an interactive terminal, but CONFIRMED BROKEN on the Squeeze
+REM cafe PC (2026-10-12) the moment its stdout/stderr get redirected to a file -- which is
+REM exactly what the line below does, so this wrapper silently produced zero output forever
+REM (order printing + تقفيل reports both just stopped, no error anywhere) even though running
+REM `python print_bridge.py` directly in a terminal worked perfectly. Fix: install the real
+REM Python from python.org (NOT the Store one) and point PYTHON_EXE at that install instead --
+REM its default per-user install path, used below.
+set PYTHON_EXE=%LOCALAPPDATA%\Programs\Python\Python312\python.exe
 
 cd /d "%~dp0"
 
