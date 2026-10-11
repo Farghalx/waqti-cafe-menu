@@ -85,6 +85,15 @@
     .empty { text-align:center; color:var(--muted); padding:60px 16px; font-weight:600; }
     .refresh-note { text-align:center; color:var(--muted); font-size:12px; padding:10px; }
 
+    /* ---- Day-nav bar (Expenses + History: ◀ السابق / اليوم / التالي ▶) ---- */
+    .daynav { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:14px 16px 0; }
+    .daynav button { flex:0 0 auto; background:#fff; border:1.5px solid var(--line); border-radius:10px;
+      padding:8px 12px; font-family:inherit; font-weight:800; font-size:13.5px; color:var(--blue); cursor:pointer; }
+    .daynav button:disabled { opacity:.4; cursor:default; }
+    .daynav button:active:not(:disabled) { transform:scale(.95); }
+    .daynav .daylabel { font-weight:800; font-size:14px; color:var(--ink); padding:4px 8px; }
+    .daynav .daylabel.jumpable { color:var(--blue); cursor:pointer; text-decoration:underline; }
+
     /* ---- Expenses tab (تقفيل) ---- */
     .exp-form { padding:14px 16px 0; }
     .add-item-btn { width:100%; background:#fff; border:1.5px dashed var(--line); border-radius:12px; padding:11px;
@@ -203,6 +212,11 @@
     </div>
 
     <div id="historySection" style="display:none">
+      <div class="daynav">
+        <button onclick="shiftHistoryDay(-1)">◀ يوم</button>
+        <span class="daylabel" id="histDayLabel"></span>
+        <button onclick="shiftHistoryDay(1)" id="histNextDayBtn">يوم ▶</button>
+      </div>
       <div class="histpicker">
         <input type="date" id="histFrom" />
         <input type="date" id="histTo" />
@@ -213,13 +227,18 @@
     </div>
 
     <div id="expensesSection" style="display:none">
-      <div class="exp-form">
+      <div class="daynav">
+        <button onclick="changeExpensesDate(-1)">◀ السابق</button>
+        <span class="daylabel" id="expDateLabel"></span>
+        <button onclick="changeExpensesDate(1)" id="expNextDayBtn">التالي ▶</button>
+      </div>
+      <div class="exp-form" id="expAddRow">
         <div class="field"><label>المبلغ</label><input id="expAmount" type="number" inputmode="decimal" placeholder="مثلاً: 50" /></div>
         <div class="field"><label>ملحوظة (اختياري)</label><input id="expNote" placeholder="مثلاً: لبن" /></div>
         <button class="save-btn" id="expAddBtn" onclick="addExpense()">إضافة</button>
       </div>
       <div class="stats">
-        <div class="stat"><b id="expTotal">0</b><small>مصروفات النهاردة</small></div>
+        <div class="stat"><b id="expTotal">0</b><small id="expTotalLabel">مصروفات النهاردة</small></div>
       </div>
       <div class="listwrap" id="expensesList"></div>
     </div>
@@ -297,13 +316,33 @@
     let oeOrderId = null;
     let liveOrders = []; // local cache of the last-fetched Orders list, for optimistic cancel (see cancelLive)
 
-    // ---------- Expenses local-first state: the rendered list always comes from this array,
-    // never straight from a fetch response -- add/void apply to it immediately (instant UI,
-    // no waiting on the Apps Script round-trip, which can run several seconds), sync to the
-    // Sheet in the background, and reconcile silently on success. An entry not yet confirmed
-    // (_pending) or that failed to sync (_failed, shows a retry button) is also persisted to
-    // localStorage so a reload before the background sync finishes doesn't lose it. ----------
+    // ---------- Day-nav helpers (Expenses + History: ◀ السابق / التالي ▶) ----------
+    function todayStr() {
+      const now = new Date();
+      const pad = n => String(n).padStart(2, "0");
+      return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    }
+    function shiftDate(dateStr, days) {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      const dt = new Date(y, m - 1, d + days);
+      const pad = n => String(n).padStart(2, "0");
+      return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+    }
+
+    // ---------- Expenses local-first state ----------
+    // `expenses` is the DISPLAY array renderExpenses() reads -- whatever's currently being
+    // looked at (today, merged with pending/failed writes; or a past day, pure server data).
+    // `pendingExpenses` is the DURABLE, day-nav-independent array of not-yet-confirmed (today-
+    // only) writes, mirrored to localStorage on every change. addExpense pushes the SAME
+    // object into both (shared reference), so a background sync's completion -- which always
+    // looks the entry up via pendingExpenses, never `expenses` -- still resolves correctly
+    // even if the owner flipped to a different day (reassigning `expenses` to something else
+    // entirely) while that sync was still in flight. Without this split, a sync landing after
+    // such a day-flip would silently find nothing to update, leaving a phantom "بيتزامن…" entry
+    // stuck in localStorage forever (confirmed via a dedicated test, not hypothetical).
     let expenses = [];
+    let pendingExpenses = [];
+    let expensesViewDate = null; // yyyy-MM-dd currently shown; null until loadExpenses() first runs, then always today or an explicit day-nav pick
     function expensesStorageKey() { return "waqti_pending_expenses_" + CLIENT; }
     function loadPendingExpensesFromStorage() {
       try {
@@ -312,10 +351,8 @@
       } catch (e) { return []; } // private browsing / storage disabled -- just means nothing to restore
     }
     function savePendingExpensesToStorage() {
-      try {
-        const pending = expenses.filter(x => x._pending || x._failed);
-        localStorage.setItem(expensesStorageKey(), JSON.stringify(pending));
-      } catch (e) { /* storage blocked -- in-memory state still works for this session */ }
+      try { localStorage.setItem(expensesStorageKey(), JSON.stringify(pendingExpenses)); }
+      catch (e) { /* storage blocked -- in-memory state still works for this session */ }
     }
 
     function reveal() { document.body.classList.add("ready"); }
@@ -447,9 +484,29 @@
       const pad = n => String(n).padStart(2, "0");
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
     }
+    // ◀ يوم / يوم ▶: quick-jumps the range to a single day either side of whatever single
+    // day is currently shown; if a multi-day range is currently shown instead, starts from
+    // today. Pure frontend convenience -- history already supports any date range, no backend
+    // change needed here (unlike Expenses' day-nav, which needed expense_list to accept a date).
+    function shiftHistoryDay(delta) {
+      const from = document.getElementById("histFrom").value, to = document.getElementById("histTo").value;
+      const base = (from && from === to) ? from : todayStr();
+      const next = shiftDate(base, delta);
+      document.getElementById("histFrom").value = next;
+      document.getElementById("histTo").value = next;
+      loadHistory();
+    }
+    function updateHistDayLabel() {
+      const from = document.getElementById("histFrom").value, to = document.getElementById("histTo").value;
+      const label = document.getElementById("histDayLabel");
+      const isSingleDay = from && to && from === to;
+      label.textContent = isSingleDay ? (from === todayStr() ? "اليوم" : from) : "فترة مختارة";
+      document.getElementById("histNextDayBtn").disabled = isSingleDay && from === todayStr(); // no point browsing into the future
+    }
     function loadHistory() {
       const from = document.getElementById("histFrom").value;
       const to = document.getElementById("histTo").value;
+      updateHistDayLabel();
       const box = document.getElementById("historyList");
       if (!from || !to) { box.innerHTML = '<div class="empty">اختار تاريخ البداية والنهاية</div>'; return; }
       box.innerHTML = '<div class="loading">جاري التحميل…</div>';
@@ -577,20 +634,58 @@
     // IMMEDIATELY, never waiting on the Apps Script round-trip (observed 3-7s per call live,
     // occasionally much worse) -- the network call happens in the background afterward. See
     // the `expenses` state + storage helpers declared near the top of this script.
+    // Day-nav (◀ السابق / التالي ▶): expense_add always logs to TODAY regardless of which
+    // day is being viewed (a past-dated add is a different, more complex thing -- not
+    // needed here), so the add form only makes sense -- and only shows -- on today's view.
+    // The local-first pending/localStorage machinery below is ALSO today-only for the same
+    // reason: nothing optimistic can exist for a day you can't add to.
+    function changeExpensesDate(days) {
+      expensesViewDate = shiftDate(expensesViewDate || todayStr(), days);
+      loadExpenses();
+    }
+    function jumpExpensesToday() {
+      expensesViewDate = todayStr();
+      loadExpenses();
+    }
+    function renderExpensesDateBar() {
+      const isToday = expensesViewDate === todayStr();
+      const label = document.getElementById("expDateLabel");
+      label.textContent = isToday ? "اليوم" : expensesViewDate;
+      label.className = "daylabel" + (isToday ? "" : " jumpable");
+      label.onclick = isToday ? null : jumpExpensesToday;
+      document.getElementById("expNextDayBtn").disabled = isToday; // no point browsing into the future
+      document.getElementById("expAddRow").style.display = isToday ? "" : "none";
+      document.getElementById("expTotalLabel").textContent = isToday ? "مصروفات النهاردة" : "مصروفات اليوم ده";
+    }
+
     function loadExpenses() {
-      const pending = loadPendingExpensesFromStorage();
-      if (pending.length) { expenses = pending; renderExpenses(); } // show anything unsynced from a previous visit right away, before the network even responds
-      const url = `${CFG.admin_webhook}?action=expense_list&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      if (!expensesViewDate) expensesViewDate = todayStr();
+      const isToday = expensesViewDate === todayStr();
+      renderExpensesDateBar();
+
+      if (isToday) {
+        pendingExpenses = loadPendingExpensesFromStorage();
+        expenses = pendingExpenses.slice(); // same object references as pendingExpenses -- a later sync resolving via pendingExpenses stays visible here too
+        if (expenses.length) renderExpenses(); // show anything unsynced from a previous visit right away, before the network even responds
+      } else {
+        expenses = []; // no local-first overlay for a non-today day -- just show what loads
+      }
+
+      const url = `${CFG.admin_webhook}?action=expense_list&date=${encodeURIComponent(expensesViewDate)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
       fetch(url).then(r => r.json()).then(data => {
         if (data.error) { if (!expenses.length) document.getElementById("expensesList").innerHTML = `<div class="empty">خطأ: ${esc(data.error)}</div>`; return; }
         const server = (data.expenses || []).map(x => ({ ...x }));
-        const serverIds = new Set(server.map(x => x.id));
-        // Keep any not-yet-synced local entry the server doesn't know about yet; drop the rest
-        // (the server's copy is now authoritative for everything it has).
-        const localOnly = expenses.filter(x => (x._pending || x._failed) && !serverIds.has(x.id));
-        expenses = server.concat(localOnly);
+        if (isToday) {
+          const serverIds = new Set(server.map(x => x.id));
+          // pendingExpenses is the durable source -- drop anything the server now has (e.g. a
+          // retry that landed while this fetch was already in flight).
+          pendingExpenses = pendingExpenses.filter(x => !serverIds.has(x.id));
+          expenses = server.concat(pendingExpenses);
+          savePendingExpensesToStorage();
+        } else {
+          expenses = server;
+        }
         renderExpenses();
-        savePendingExpensesToStorage();
       }).catch(() => { if (!expenses.length) document.getElementById("expensesList").innerHTML = '<div class="empty">تعذر الاتصال — حاول تاني</div>'; });
     }
 
@@ -598,7 +693,10 @@
       const total = expenses.filter(x => x.status !== "voided").reduce((s, x) => s + x.amount, 0);
       document.getElementById("expTotal").textContent = total + " " + CUR;
       const box = document.getElementById("expensesList");
-      if (!expenses.length) { box.innerHTML = '<div class="empty">لسه مفيش مصروفات النهاردة</div>'; return; }
+      if (!expenses.length) {
+        box.innerHTML = `<div class="empty">${expensesViewDate === todayStr() ? "لسه مفيش مصروفات النهاردة" : "مفيش مصروفات في اليوم ده"}</div>`;
+        return;
+      }
       box.innerHTML = "";
       [...expenses].reverse().forEach(x => {
         const voided = x.status === "voided";
@@ -623,33 +721,40 @@
     // Sends the add for one local (not-yet-synced) entry in the background. Shared by
     // addExpense (first attempt) and retryExpense (after a failure) so both reconcile the
     // same way: success swaps the temp id for the real expense_id; failure marks it _failed
-    // so renderExpenses shows a retry button instead of silently dropping it.
+    // so renderExpenses shows a retry button instead of silently dropping it. Always resolves
+    // via pendingExpenses (not `expenses`, which day-nav can reassign out from under a
+    // still-in-flight sync) -- see the pendingExpenses comment above for why that split exists.
     function syncExpenseAdd(localId) {
-      const e = expenses.find(x => x.id === localId);
+      const e = pendingExpenses.find(x => x.id === localId);
       if (!e) return;
       const url = `${CFG.admin_webhook}?action=expense_add&amount=${encodeURIComponent(e.amount)}&note=${encodeURIComponent(e.note)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      const stillToday = () => expensesViewDate === todayStr();
       fetch(url).then(r => r.json()).then(data => {
-        const cur = expenses.find(x => x.id === localId);
+        const cur = pendingExpenses.find(x => x.id === localId);
         if (!cur) return;
         if (data.error) {
           // If it was voided while still mid-sync, there's nothing on the server to void --
           // just drop it instead of surfacing a confusing "retry" for an entry the owner
           // already said she doesn't want.
-          if (cur._voidPending) { expenses = expenses.filter(x => x.id !== localId); }
+          if (cur._voidPending) { pendingExpenses = pendingExpenses.filter(x => x.id !== localId); }
           else { cur._pending = false; cur._failed = true; }
-          renderExpenses(); savePendingExpensesToStorage();
+          savePendingExpensesToStorage();
+          if (stillToday()) renderExpenses();
           return;
         }
         cur.id = data.expense_id; delete cur._pending;
         const needsVoid = cur._voidPending; delete cur._voidPending;
-        renderExpenses(); savePendingExpensesToStorage();
+        pendingExpenses = pendingExpenses.filter(x => x.id !== cur.id); // fully synced -- no longer pending bookkeeping, the next list load carries it from the server
+        savePendingExpensesToStorage();
+        if (stillToday()) renderExpenses();
         if (needsVoid) voidExpense(cur.id); // now that it has a real id, send the void the owner already requested
       }).catch(() => {
-        const cur = expenses.find(x => x.id === localId);
+        const cur = pendingExpenses.find(x => x.id === localId);
         if (!cur) return;
-        if (cur._voidPending) { expenses = expenses.filter(x => x.id !== localId); }
+        if (cur._voidPending) { pendingExpenses = pendingExpenses.filter(x => x.id !== localId); }
         else { cur._pending = false; cur._failed = true; }
-        renderExpenses(); savePendingExpensesToStorage();
+        savePendingExpensesToStorage();
+        if (stillToday()) renderExpenses();
       });
     }
 
@@ -665,35 +770,50 @@
       const now = new Date();
       const pad = n => String(n).padStart(2, "0");
       const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-      expenses.push({ id: localId, ts, amount, note, status: "active", _pending: true });
+      const entry = { id: localId, ts, amount, note, status: "active", _pending: true };
+      pendingExpenses.push(entry);
+      expenses.push(entry); // only reachable while viewing today -- the add row is hidden otherwise
       renderExpenses();
       savePendingExpensesToStorage();
       syncExpenseAdd(localId);
     }
 
     function retryExpense(id) {
-      const e = expenses.find(x => x.id === id);
+      const e = pendingExpenses.find(x => x.id === id);
       if (!e || !e._failed) return;
       e._failed = false; e._pending = true;
-      renderExpenses(); savePendingExpensesToStorage();
+      renderExpenses();
+      savePendingExpensesToStorage();
       syncExpenseAdd(id);
     }
 
     // Marks voided instantly in the UI; syncs to the Sheet in the background, rolling back
     // with an alert only if that sync actually fails. If the entry is still mid-add (never
     // got a real id yet), the actual void call is deferred until syncExpenseAdd resolves.
+    // Checks pendingExpenses FIRST (canonical for any not-yet-confirmed entry); a confirmed
+    // entry only ever lives in `expenses`. The network call always fires even if no local
+    // copy is found (e.g. the owner navigated to a different day right as syncExpenseAdd's
+    // deferred void was about to fire) -- a void the owner asked for must never get silently
+    // dropped just because its item isn't currently on screen.
     function voidExpense(id) {
-      const e = expenses.find(x => x.id === id);
-      if (!e) return;
-      const prevStatus = e.status;
-      e.status = "voided";
-      renderExpenses();
-      savePendingExpensesToStorage();
-      if (e._pending) { e._voidPending = true; return; }
+      const e = pendingExpenses.find(x => x.id === id) || expenses.find(x => x.id === id);
+      const prevStatus = e ? e.status : null;
+      if (e) {
+        e.status = "voided";
+        renderExpenses();
+        savePendingExpensesToStorage();
+        if (e._pending) { e._voidPending = true; return; }
+      }
       const url = `${CFG.admin_webhook}?action=expense_void&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
       fetch(url).then(r => r.json()).then(data => {
-        if (data.error) { e.status = prevStatus; renderExpenses(); alert("تعذر إلغاء المصروف: " + data.error); }
-      }).catch(() => { e.status = prevStatus; renderExpenses(); alert("تعذر إلغاء المصروف — حاول تاني"); });
+        if (data.error) {
+          if (e) { e.status = prevStatus; renderExpenses(); }
+          alert("تعذر إلغاء المصروف: " + data.error);
+        }
+      }).catch(() => {
+        if (e) { e.status = prevStatus; renderExpenses(); }
+        alert("تعذر إلغاء المصروف — حاول تاني");
+      });
     }
 
     // ---------- Menu tab: load + group the Menu sheet (this IS the full catalog -- every

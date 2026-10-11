@@ -385,12 +385,13 @@ def format_date_range_ar(from_date, to_date):
 
 
 def build_report_image(report_data):
-    """تقفيل (closing) ticket: sales+expenses+net. Same fonts/RECEIPT_WIDTH/pad/line_h_*/
-    divider_h constants and fit_arabic_line/draw_right/draw_center helpers as
-    build_receipt_image, so it visually belongs to the same system. Content is deliberately
-    minimal (title, date range, sales, expenses, net -- nothing else): the owner's own framing
-    was "so they know their daily sales and also what they spent" -- cramming more in works
-    against clean/easy-to-read, which was explicitly asked for."""
+    """تقفيل (closing) ticket: what sold (qty + line total per item, biggest earner first),
+    then sales+expenses+net. Same fonts/RECEIPT_WIDTH/pad/line_h_*/divider_h constants and
+    fit_arabic_line/draw_right/draw_center helpers as build_receipt_image, so it visually
+    belongs to the same system. The itemized section is OPTIONAL (items_sold missing/empty --
+    e.g. a day with zero orders, or an older caller) -- falls back to exactly the original
+    fixed height with no section/divider added, so this never changes anything for existing
+    callers."""
     pad = 20
     ar_header = ImageFont.truetype(ARABIC_FONT_PATH, 46)
     latin_header = ImageFont.truetype(LATIN_FONT_PATH, 46)
@@ -406,6 +407,10 @@ def build_report_image(report_data):
     # Not run through fit_arabic_line (see format_date_range_ar for why) -- always short/
     # fixed-format enough to fit the receipt width without truncation.
     range_line = format_date_range_ar(report_data['from'], report_data['to'])
+    item_lines = [
+        fit_arabic_line(measure, f"{it['name']} × {it['qty']} = {it['total']} ج", max_text_width, ar_reg, latin_reg)
+        for it in (report_data.get('items_sold') or [])
+    ]
     sales_line = fit_arabic_line(
         measure, f"المبيعات: {report_data['sales_count']} طلب — {report_data['sales_total']} ج", max_text_width, ar_reg, latin_reg
     )
@@ -416,9 +421,11 @@ def build_report_image(report_data):
 
     line_h_reg, line_h_bold, line_h_header = 40, 44, 60
     divider_h = 26
+    items_block_h = (len(item_lines) * line_h_reg + divider_h) if item_lines else 0
     height = (
         pad + line_h_header + divider_h
         + line_h_bold + line_h_reg + divider_h
+        + items_block_h
         + line_h_reg + line_h_reg + divider_h
         + line_h_header + pad
     )
@@ -438,6 +445,13 @@ def build_report_image(report_data):
     y += line_h_reg
     d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
     y += divider_h
+
+    if item_lines:
+        for line in item_lines:
+            draw_right(d, RECEIPT_WIDTH - pad, y, line, ar_reg, latin_reg)
+            y += line_h_reg
+        d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+        y += divider_h
 
     draw_right(d, RECEIPT_WIDTH - pad, y, sales_line, ar_reg, latin_reg)
     y += line_h_reg
