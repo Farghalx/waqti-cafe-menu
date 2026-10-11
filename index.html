@@ -193,7 +193,14 @@
     const params = new URLSearchParams(location.search);
     const CLIENT = params.get("c") || "elbob";        // ?c=<restaurant>, defaults to elbob
     const table = params.get("table") || "?";
-    document.getElementById("tableLabel").textContent = "ترابيزة " + table;
+    // Set when embedded inside admin.html's "+ طلب جديد" cashier flow (a walk-in who pays at
+    // the counter instead of scanning a table's QR) -- see
+    // docs/superpowers/specs/2026-10-11-cashier-order-picker-design.md. Skips the customer
+    // name/phone capture prompt (meaningless for an anonymous counter sale) and reports
+    // completion back to the parent window instead of showing the customer-facing toast
+    // (see success() below).
+    const CASHIER = params.get("cashier") === "1";
+    document.getElementById("tableLabel").textContent = CASHIER ? "طلب كاونتر" : "ترابيزة " + table;
 
     const SUGAR = {
       style:  { options: ['سادة','على الريحة','مظبوط','زيادة'], def: 'مظبوط' },
@@ -375,7 +382,7 @@
       if (cfg.demo) document.getElementById("demoFlag").style.display = "block";
       document.title = (cfg.name_ar || "وقتي") + " — الطلب";
       render(cfg);
-      showCaptureIfFirstScan();
+      if (!CASHIER) showCaptureIfFirstScan();
       reveal();
     }
 
@@ -603,7 +610,19 @@
         .then(data => { if (data && data.error) throw new Error(data.error); success(); })
         .catch(() => { btn.disabled = false; btn.textContent = "ابعت الطلب"; alert("حصل خطأ. حاول تاني أو نادي الجرسون."); });
     }
-    function success() { closeSheets(); document.getElementById("toast").classList.add("show"); }
+    function success() {
+      closeSheets();
+      if (CASHIER) {
+        // Tell admin.html's embedded iframe wrapper the order landed -- it closes the sheet
+        // and refreshes the orders list on its end. Skips the customer-facing toast entirely
+        // (the parent is about to collapse the whole sheet, so showing it would just be
+        // jank). window.parent === window when not actually framed (e.g. this URL opened
+        // directly, or under test), so this is a harmless no-op in that case.
+        try { window.parent.postMessage({ type: "waqti_order_sent" }, location.origin); } catch (e) {}
+        return;
+      }
+      document.getElementById("toast").classList.add("show");
+    }
     function resetAll() { cart = []; refresh(); document.getElementById("toast").classList.remove("show");
       document.getElementById("custName").value = ""; document.getElementById("custPhone").value = "";
       const b = document.getElementById("sendBtn"); b.disabled = false; b.textContent = "ابعت الطلب"; }

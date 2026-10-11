@@ -76,6 +76,32 @@ def fetch_orders():
     return data.get("orders", [])
 
 
+def fetch_pending_reports():
+    url = f"{ADMIN_WEBHOOK}?action=report_pending&key={ADMIN_KEY}"
+    with urllib.request.urlopen(url, timeout=10) as r:
+        data = json.loads(r.read().decode("utf-8"))
+    if "error" in data:
+        raise RuntimeError(data["error"])
+    return data.get("requests", [])
+
+
+def fetch_report_data(from_date, to_date):
+    url = f"{ADMIN_WEBHOOK}?action=report_data&from={from_date}&to={to_date}&key={ADMIN_KEY}"
+    with urllib.request.urlopen(url, timeout=10) as r:
+        data = json.loads(r.read().decode("utf-8"))
+    if "error" in data:
+        raise RuntimeError(data["error"])
+    return data
+
+
+def mark_report_done(request_id):
+    url = f"{ADMIN_WEBHOOK}?action=report_done&id={request_id}&key={ADMIN_KEY}"
+    with urllib.request.urlopen(url, timeout=10) as r:
+        data = json.loads(r.read().decode("utf-8"))
+    if "error" in data:
+        raise RuntimeError(data["error"])
+
+
 def _local_datetime(raw):
     """Sheet cells sometimes come back as ISO-UTC ('...T..Z', Sheets auto-typed
     the cell as a Date) and sometimes as the plain local string we wrote
@@ -345,6 +371,104 @@ def print_order(order, order_number):
     _send_to_printer(build_kitchen_receipt_image(order, order_number))
 
 
+def format_date_range_ar(from_date, to_date):
+    """Compose a right-to-left-readable 'from X to Y' line for two raw ISO dates, WITHOUT
+    routing the combined string through ar()/get_display() as one string -- python-bidi
+    mishandles two separate hyphenated-date runs inside one RTL-majority line, silently
+    reversing the SECOND date's digit groups (e.g. "2026-10-11" -> "11-10-2026") while
+    leaving the first alone. Confirmed via direct repro, not hypothetical. Only "إلى" (a lone
+    Arabic word, no ambiguity) goes through ar(); the two raw dates are placed around it in
+    final left-to-right PIXEL order directly -- to_date first (leftmost = read last), then
+    إلى, then from_date (rightmost = read first), so an RTL reader sees "from_date إلى
+    to_date"."""
+    return f"{to_date} {ar('إلى')} {from_date}"
+
+
+def build_report_image(report_data):
+    """تقفيل (closing) ticket: sales+expenses+net. Same fonts/RECEIPT_WIDTH/pad/line_h_*/
+    divider_h constants and fit_arabic_line/draw_right/draw_center helpers as
+    build_receipt_image, so it visually belongs to the same system. Content is deliberately
+    minimal (title, date range, sales, expenses, net -- nothing else): the owner's own framing
+    was "so they know their daily sales and also what they spent" -- cramming more in works
+    against clean/easy-to-read, which was explicitly asked for."""
+    pad = 20
+    ar_header = ImageFont.truetype(ARABIC_FONT_PATH, 46)
+    latin_header = ImageFont.truetype(LATIN_FONT_PATH, 46)
+    ar_bold = ImageFont.truetype(ARABIC_FONT_PATH, 30)
+    latin_bold = ImageFont.truetype(LATIN_FONT_PATH, 30)
+    ar_reg = ImageFont.truetype(ARABIC_FONT_PATH, 28)
+    latin_reg = ImageFont.truetype(LATIN_FONT_PATH, 28)
+
+    measure = ImageDraw.Draw(Image.new("L", (1, 1)))
+    max_text_width = RECEIPT_WIDTH - 2 * pad
+
+    title_line = fit_arabic_line(measure, "تقفيل", max_text_width, ar_bold, latin_bold)
+    # Not run through fit_arabic_line (see format_date_range_ar for why) -- always short/
+    # fixed-format enough to fit the receipt width without truncation.
+    range_line = format_date_range_ar(report_data['from'], report_data['to'])
+    sales_line = fit_arabic_line(
+        measure, f"المبيعات: {report_data['sales_count']} طلب — {report_data['sales_total']} ج", max_text_width, ar_reg, latin_reg
+    )
+    expenses_line = fit_arabic_line(
+        measure, f"المصروفات: {report_data['expenses_count']} — {report_data['expenses_total']} ج", max_text_width, ar_reg, latin_reg
+    )
+    net_line = fit_arabic_line(measure, f"الصافي: {report_data['net']} ج", max_text_width, ar_header, latin_header)
+
+    line_h_reg, line_h_bold, line_h_header = 40, 44, 60
+    divider_h = 26
+    height = (
+        pad + line_h_header + divider_h
+        + line_h_bold + line_h_reg + divider_h
+        + line_h_reg + line_h_reg + divider_h
+        + line_h_header + pad
+    )
+
+    img = Image.new("L", (RECEIPT_WIDTH, height), 255)
+    d = ImageDraw.Draw(img)
+    y = pad
+
+    draw_center(d, RECEIPT_WIDTH / 2, y, CAFE_NAME, latin_header)
+    y += line_h_header
+    d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+    y += divider_h
+
+    draw_right(d, RECEIPT_WIDTH - pad, y, title_line, ar_bold, latin_bold)
+    y += line_h_bold
+    draw_right(d, RECEIPT_WIDTH - pad, y, range_line, ar_reg, latin_reg)
+    y += line_h_reg
+    d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+    y += divider_h
+
+    draw_right(d, RECEIPT_WIDTH - pad, y, sales_line, ar_reg, latin_reg)
+    y += line_h_reg
+    draw_right(d, RECEIPT_WIDTH - pad, y, expenses_line, ar_reg, latin_reg)
+    y += line_h_reg
+    d.line([(pad, y + divider_h / 2), (RECEIPT_WIDTH - pad, y + divider_h / 2)], fill=0, width=2)
+    y += divider_h
+
+    draw_right(d, RECEIPT_WIDTH - pad, y, net_line, ar_header, latin_header)
+
+    return img
+
+
+def print_report(report_data):
+    _send_to_printer(build_report_image(report_data))
+
+
+def check_report_queue():
+    """Called every poll cycle, same 2s cadence as orders -- ReportQueue stays near-empty by
+    construction (hard-delete on done), so the cost is a trivial read on a tiny sheet,
+    negligible next to the 500-row Orders tail-read that already happens every cycle. A
+    failed request is left pending (not marked done) so it retries next cycle instead of
+    silently vanishing from the queue."""
+    for req in fetch_pending_reports():
+        try:
+            print_report(fetch_report_data(req["from"], req["to"]))
+            mark_report_done(req["request_id"])
+        except Exception as e:
+            print(f"[warn] report {req['request_id']} failed: {e} -- retries next cycle")
+
+
 def main():
     if not ADMIN_WEBHOOK:
         print("ADMIN_WEBHOOK is empty — paste the apps_script_v2.gs /exec URL first.")
@@ -377,6 +501,8 @@ def main():
                 printed.add(order["id"])
             if new_orders or pruned:
                 save_printed_ids(printed)
+
+            check_report_queue()
         except Exception as e:
             print(f"[warn] {e} — retrying next cycle")
         time.sleep(POLL_SECONDS)

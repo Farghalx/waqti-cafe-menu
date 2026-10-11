@@ -49,6 +49,16 @@
     .stat b { display:block; font-size:22px; color:var(--blue); }
     .stat small { color:var(--muted); font-size:12px; font-weight:700; }
     .listwrap { padding:0 16px; }
+
+    /* ---- History tab ---- */
+    .histpicker { display:flex; flex-wrap:wrap; gap:8px; padding:14px 16px; }
+    .histpicker input[type=date] { flex:1; min-width:0; border:1.5px solid var(--line); border-radius:12px;
+      padding:10px 12px; font-family:inherit; font-size:14px; color:var(--ink); background:#fff; }
+    .histpicker button { flex:0 0 auto; background:var(--blue); color:#fff; border:none; border-radius:12px;
+      padding:10px 18px; font-family:inherit; font-weight:800; font-size:14px; cursor:pointer; }
+    .histpicker button:disabled { opacity:.5; cursor:default; }
+    .histpicker .print-btn { flex:1 1 100%; background:var(--gold); }
+    .hist-day .tbl { font-size:14px; }
     .order { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:10px;
       box-shadow:var(--shadow); }
     .order.cancelled { opacity:.5; }
@@ -58,13 +68,39 @@
     .order .items { margin:8px 0; font-size:14px; color:var(--ink); line-height:1.6; }
     .order .row2 { display:flex; justify-content:space-between; align-items:center; margin-top:4px; }
     .order .total { color:var(--gold); font-weight:800; font-size:16px; }
+    .order .order-actions { display:flex; gap:8px; align-items:center; }
     .order .cancel-btn { background:#fff; border:1.5px solid var(--cancel); color:var(--cancel); font-family:inherit;
       font-weight:700; font-size:13px; padding:7px 14px; border-radius:10px; cursor:pointer; }
     .order .cancel-btn:active { transform:scale(.96); }
+    .order .edit-btn { background:#fff; border:1.5px solid var(--blue); color:var(--blue); font-family:inherit;
+      font-weight:700; font-size:13px; padding:7px 14px; border-radius:10px; cursor:pointer; }
+    .order .edit-btn:active { transform:scale(.96); }
     .order .status-chip { font-size:12px; font-weight:800; padding:4px 10px; border-radius:999px; }
     .status-chip.cancelled { background:#fbe5e5; color:var(--cancel); }
     .empty { text-align:center; color:var(--muted); padding:60px 16px; font-weight:600; }
     .refresh-note { text-align:center; color:var(--muted); font-size:12px; padding:10px; }
+
+    /* ---- Expenses tab (تقفيل) ---- */
+    .exp-form { padding:14px 16px 0; }
+    .add-item-btn { width:100%; background:#fff; border:1.5px dashed var(--line); border-radius:12px; padding:11px;
+      font-family:inherit; font-weight:700; font-size:14px; color:var(--blue); cursor:pointer; margin-bottom:14px; }
+
+    /* ---- Order edit sheet ---- */
+    .oe-item-row { display:flex; gap:6px; margin-bottom:10px; align-items:center; }
+    .oe-item-row input { border:1.5px solid var(--line); border-radius:10px; padding:10px; font-family:inherit;
+      font-size:14px; color:var(--ink); background:#fff; min-width:0; }
+    .oe-item-row input:focus { outline:none; border-color:var(--blue); }
+    .oe-item-row .oe-item-name { flex:2; }
+    .oe-item-row .oe-item-qty { flex:1; }
+    .oe-item-row .oe-item-price { flex:1; }
+    .oe-item-remove { flex:0 0 auto; width:34px; height:34px; border-radius:10px; border:1px solid var(--line);
+      background:#fff; font-size:15px; cursor:pointer; }
+    .oe-total { font-weight:800; font-size:17px; color:var(--gold); margin-bottom:14px; text-align:center; }
+
+    /* ---- Cashier order sheet (embeds index.html's real menu picker) ---- */
+    .sheet.sheet-frame { padding:0; max-height:88vh; max-height:88dvh; }
+    .sheet.sheet-frame iframe { width:100%; height:80vh; height:80dvh; border:none; display:block;
+      border-radius:24px 24px 0 0; }
 
     /* ---- Menu tab ---- */
     .nav { position:sticky; top:0; z-index:8; background:var(--bg); display:flex; gap:8px; padding:12px 16px;
@@ -86,10 +122,13 @@
     .mprice { color:var(--gold); font-size:13px; font-weight:700; margin-top:3px; }
     .mprice s { color:var(--muted); font-weight:500; text-decoration-color:var(--muted); margin-left:4px; }
     .mactions { display:flex; align-items:center; gap:8px; flex:0 0 auto; }
-    .medit, .moffer { width:36px; height:36px; border-radius:10px; border:1px solid var(--line); background:#fff; font-size:16px;
+    .medit { width:36px; height:36px; border-radius:10px; border:1px solid var(--line); background:#fff; font-size:16px;
       display:grid; place-items:center; cursor:pointer; }
-    .medit:active, .moffer:active { transform:scale(.92); }
-    .moffer.on { background:var(--gold); border-color:var(--gold); }
+    .medit:active { transform:scale(.92); }
+    .moffer { border:1px solid var(--line); border-radius:999px; padding:9px 14px; background:#fff;
+      font-family:inherit; font-weight:800; font-size:13px; white-space:nowrap; color:var(--ink); cursor:pointer; }
+    .moffer:active { transform:scale(.92); }
+    .moffer.on { background:var(--gold); border-color:var(--gold); color:#fff; }
     .mstock { border:none; border-radius:999px; padding:9px 14px; font-family:inherit; font-weight:800; font-size:13px;
       cursor:pointer; white-space:nowrap; color:#fff; min-width:64px; }
     .mstock.on { background:var(--ok); }
@@ -144,6 +183,8 @@
 
     <div class="toptabs">
       <button id="tabOrdersBtn" class="active" onclick="switchTab('orders')">الطلبات</button>
+      <button id="tabHistoryBtn" style="display:none" onclick="switchTab('history')">السجل</button>
+      <button id="tabExpensesBtn" style="display:none" onclick="switchTab('expenses')">المصروفات</button>
       <button id="tabMenuBtn" style="display:none" onclick="switchTab('menu')">المنيو</button>
     </div>
 
@@ -156,6 +197,28 @@
       <div class="refresh-note" id="refreshNote"></div>
     </div>
 
+    <div id="historySection" style="display:none">
+      <div class="histpicker">
+        <input type="date" id="histFrom" />
+        <input type="date" id="histTo" />
+        <button onclick="loadHistory()">عرض</button>
+        <button class="print-btn" id="printReportBtn" style="display:none" onclick="printReport()">🖨️ اطبع تقفيل</button>
+      </div>
+      <div class="listwrap" id="historyList"></div>
+    </div>
+
+    <div id="expensesSection" style="display:none">
+      <div class="exp-form">
+        <div class="field"><label>المبلغ</label><input id="expAmount" type="number" inputmode="decimal" placeholder="مثلاً: 50" /></div>
+        <div class="field"><label>ملحوظة (اختياري)</label><input id="expNote" placeholder="مثلاً: لبن" /></div>
+        <button class="save-btn" id="expAddBtn" onclick="addExpense()">إضافة</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><b id="expTotal">0</b><small>مصروفات النهاردة</small></div>
+      </div>
+      <div class="listwrap" id="expensesList"></div>
+    </div>
+
     <div id="menuSection" style="display:none">
       <nav class="nav" id="nav"></nav>
       <main id="menuList"><div class="loading">جاري تحميل المنيو…</div></main>
@@ -163,6 +226,7 @@
   </div>
 
   <button class="fab" id="fab" style="display:none" onclick="openAdd()">+ طبق جديد</button>
+  <button class="fab" id="newOrderFab" style="display:none" onclick="openNewOrder()">+ طلب جديد</button>
 
   <div class="scrim" id="scrim" onclick="closeSheets()"></div>
 
@@ -201,15 +265,31 @@
     <button class="save-btn" id="addSave" onclick="saveAdd()">إضافة</button>
   </div>
 
+  <div class="sheet" id="orderEditSheet">
+    <button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button>
+    <div class="title">تعديل الطلب</div>
+    <div class="field"><label>رقم الترابيزة</label><input id="oeTable" /></div>
+    <div id="oeItems"></div>
+    <button type="button" class="add-item-btn" onclick="addOeItemLine()">+ أضف صنف</button>
+    <div class="oe-total">الإجمالي: <span id="oeTotal">0</span> <span id="oeTotalCur"></span></div>
+    <button class="save-btn" id="oeSave" onclick="saveOrderEdit()">حفظ</button>
+  </div>
+
+  <div class="sheet sheet-frame" id="newOrderSheet">
+    <button class="x-btn" onclick="closeSheets()" aria-label="إغلاق">✕</button>
+    <iframe id="newOrderFrame" src="about:blank"></iframe>
+  </div>
+
   <script>
     const params = new URLSearchParams(location.search);
     const CLIENT = params.get("c") || "elbob";
     const initialTab = params.get("tab") === "menu" ? "menu" : "orders";
-    let CFG = {}, CUR = "ج", LIVE = false, hasMenu = false, POLL = null;
+    let CFG = {}, CUR = "ج", LIVE = false, hasMenu = false, hasExpenses = false, POLL = null;
     let mockOrders = [];
-    let ordersStarted = false, menuLoaded = false;
+    let ordersStarted = false, menuLoaded = false, historyLoaded = false, expensesLoaded = false;
     let state = { items: [], catOrder: [] };
     let editingId = null;
+    let oeOrderId = null;
 
     function reveal() { document.body.classList.add("ready"); }
     setTimeout(reveal, 2500); // safety net -- never leave the page permanently blank
@@ -235,7 +315,16 @@
       document.title = "لوحة الإدارة — " + cleanName;
       LIVE = !!cfg.admin_webhook;
       hasMenu = !!cfg.price_sheet_api;
+      // Gated on a per-client features flag, not just LIVE -- admin.html/apps_script_v2.gs
+      // are shared across every client, and most other clients' Sheets don't have the
+      // Expenses/ReportQueue tabs yet. Same reasoning covers the تقفيل print button on the
+      // History tab below (report_request would hit a missing sheet on their backend).
+      hasExpenses = LIVE && !!(cfg.features && cfg.features.expenses);
       document.getElementById("tabMenuBtn").style.display = hasMenu ? "block" : "none";
+      document.getElementById("tabExpensesBtn").style.display = hasExpenses ? "block" : "none";
+      document.getElementById("printReportBtn").style.display = hasExpenses ? "block" : "none";
+      // History reads real Orders history via the backend -- nothing to show in demo mode.
+      document.getElementById("tabHistoryBtn").style.display = LIVE ? "block" : "none";
       document.getElementById("pinInput").addEventListener("keydown", e => { if (e.key === "Enter") tryPin(); });
       reveal();
     }
@@ -254,12 +343,19 @@
     // ---------- Section tabs ----------
     function switchTab(tab) {
       document.getElementById("tabOrdersBtn").classList.toggle("active", tab === "orders");
+      document.getElementById("tabHistoryBtn").classList.toggle("active", tab === "history");
+      document.getElementById("tabExpensesBtn").classList.toggle("active", tab === "expenses");
       document.getElementById("tabMenuBtn").classList.toggle("active", tab === "menu");
       document.getElementById("ordersSection").style.display = tab === "orders" ? "block" : "none";
+      document.getElementById("historySection").style.display = tab === "history" ? "block" : "none";
+      document.getElementById("expensesSection").style.display = tab === "expenses" ? "block" : "none";
       document.getElementById("menuSection").style.display = tab === "menu" ? "block" : "none";
       document.getElementById("fab").style.display = (tab === "menu" && hasMenu) ? "flex" : "none";
+      document.getElementById("newOrderFab").style.display = (tab === "orders" && LIVE) ? "flex" : "none";
       document.getElementById("heroSub").textContent = tab === "menu"
-        ? "إدارة المنيو — الأسعار والتوفر" : "لوحة الإدارة — الطلبات والإجمالي";
+        ? "إدارة المنيو — الأسعار والتوفر" : tab === "history"
+        ? "سجل المبيعات — حسب اليوم" : tab === "expenses"
+        ? "المصروفات — تقفيل اليوم" : "لوحة الإدارة — الطلبات والإجمالي";
       document.getElementById("demoFlag").style.display = (tab === "orders" && !LIVE) ? "block" : "none";
 
       if (tab === "orders" && !ordersStarted) {
@@ -274,6 +370,17 @@
           POLL = setInterval(refreshLive, 15000);
         }
       }
+      if (tab === "history" && LIVE && !historyLoaded) {
+        historyLoaded = true;
+        const today = new Date(), weekAgo = new Date(today.getTime() - 6 * 86400000);
+        document.getElementById("histFrom").value = toDateStr(weekAgo);
+        document.getElementById("histTo").value = toDateStr(today);
+        loadHistory();
+      }
+      if (tab === "expenses" && hasExpenses && !expensesLoaded) {
+        expensesLoaded = true;
+        loadExpenses();
+      }
       if (tab === "menu" && hasMenu && !menuLoaded) {
         menuLoaded = true;
         loadMenu();
@@ -285,13 +392,62 @@
       const url = `${CFG.admin_webhook}?action=list&key=${encodeURIComponent(CFG.admin_key || "")}`;
       fetch(url).then(r => r.json()).then(data => {
         if (data.error) { document.getElementById("refreshNote").textContent = "خطأ: " + data.error; return; }
-        renderOrders(data.orders, data.expected_cash, cancelLive);
+        renderOrders(data.orders, data.expected_cash, cancelLive, openOrderEdit);
       }).catch(() => { document.getElementById("refreshNote").textContent = "تعذر الاتصال — هيحاول تاني"; });
     }
     function cancelLive(id) {
       const url = `${CFG.admin_webhook}?action=cancel&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
       fetch(url).then(r => r.json()).then(() => refreshLive())
         .catch(() => alert("تعذر إلغاء الطلب — حاول تاني"));
+    }
+
+    // ---------- History tab: per-day totals over an owner-chosen date range ----------
+    function toDateStr(d) {
+      const pad = n => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+    function loadHistory() {
+      const from = document.getElementById("histFrom").value;
+      const to = document.getElementById("histTo").value;
+      const box = document.getElementById("historyList");
+      if (!from || !to) { box.innerHTML = '<div class="empty">اختار تاريخ البداية والنهاية</div>'; return; }
+      box.innerHTML = '<div class="loading">جاري التحميل…</div>';
+      const url = `${CFG.admin_webhook}?action=history&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(data => {
+        if (data.error) { box.innerHTML = `<div class="empty">خطأ: ${esc(data.error)}</div>`; return; }
+        renderHistory(data.days || []);
+      }).catch(() => { box.innerHTML = '<div class="empty">تعذر الاتصال — حاول تاني</div>'; });
+    }
+    function renderHistory(days) {
+      const box = document.getElementById("historyList");
+      if (!days.length) { box.innerHTML = '<div class="empty">مفيش طلبات في الفترة دي</div>'; return; }
+      box.innerHTML = "";
+      [...days].reverse().forEach(d => {
+        const el = document.createElement("div");
+        el.className = "order hist-day";
+        el.innerHTML = `
+          <div class="row1"><span class="tbl">${esc(d.date)}</span><span class="time">${esc(d.orders)} طلب</span></div>
+          <div class="row2"><span class="total">${esc(d.total)} ${CUR}</span></div>`;
+        box.appendChild(el);
+      });
+    }
+
+    // ---------- تقفيل print trigger: reuses the history tab's own from/to picker instead of
+    // duplicating day/week shortcut logic in a second place -- one date range, two actions
+    // (view, print). Fire-and-forget by design (no print-confirmation echoed back). ----------
+    function printReport() {
+      const from = document.getElementById("histFrom").value, to = document.getElementById("histTo").value;
+      if (!from || !to) { alert("اختار تاريخ البداية والنهاية"); return; }
+      const btn = document.getElementById("printReportBtn");
+      btn.disabled = true;
+      const url = `${CFG.admin_webhook}?action=report_request&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(data => {
+        if (data.error) { alert("خطأ: " + data.error); return; }
+        alert("طلب الطباعة وصل — هيطبع على الطابعة في الكافيه خلال لحظات");
+      }).catch(() => alert("تعذر الاتصال — حاول تاني"))
+        // Brief self-disable so impatient re-tapping during a real print_bridge.py outage
+        // doesn't inflate the queue further than necessary.
+        .finally(() => { setTimeout(() => { btn.disabled = false; }, 5000); });
     }
 
     // ---------- Orders tab: demo mode (mock data, no backend) ----------
@@ -343,7 +499,7 @@
       return esc(raw); // legacy plain-string order, pre-dating the JSON format
     }
 
-    function renderOrders(orders, total, onCancel) {
+    function renderOrders(orders, total, onCancel, onEdit) {
       const activeCount = orders.filter(o => o.status !== "cancelled").length;
       document.getElementById("statCount").textContent = activeCount;
       document.getElementById("statTotal").textContent = total + " " + CUR;
@@ -359,13 +515,73 @@
           <div class="items">${itemsLabel(o.items)}</div>
           <div class="row2">
             <span class="total">${o.total} ${CUR}</span>
-            ${cancelled ? '<span class="status-chip cancelled">ملغي</span>' : `<button class="cancel-btn" data-id="${o.id}">إلغاء الطلب</button>`}
+            ${cancelled ? '<span class="status-chip cancelled">ملغي</span>' : `
+              <div class="order-actions">
+                ${onEdit ? '<button class="edit-btn">✏️ تعديل</button>' : ''}
+                <button class="cancel-btn" data-id="${o.id}">إلغاء الطلب</button>
+              </div>`}
           </div>`;
-        if (!cancelled) el.querySelector(".cancel-btn").onclick = () => {
-          if (confirm("تأكيد إلغاء طلب ترابيزة " + o.table + "؟")) onCancel(o.id);
+        if (!cancelled) {
+          el.querySelector(".cancel-btn").onclick = () => {
+            if (confirm("تأكيد إلغاء طلب ترابيزة " + o.table + "؟")) onCancel(o.id);
+          };
+          if (onEdit) el.querySelector(".edit-btn").onclick = () => onEdit(o);
+        }
+        box.appendChild(el);
+      });
+    }
+
+    // ---------- Expenses tab (تقفيل): log a cash expense, void a mistaken entry ----------
+    function loadExpenses() {
+      const url = `${CFG.admin_webhook}?action=expense_list&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(data => {
+        if (data.error) { document.getElementById("expensesList").innerHTML = `<div class="empty">خطأ: ${esc(data.error)}</div>`; return; }
+        renderExpenses(data.expenses || [], data.total || 0);
+      }).catch(() => { document.getElementById("expensesList").innerHTML = '<div class="empty">تعذر الاتصال — حاول تاني</div>'; });
+    }
+
+    function renderExpenses(expenses, total) {
+      document.getElementById("expTotal").textContent = total + " " + CUR;
+      const box = document.getElementById("expensesList");
+      if (!expenses.length) { box.innerHTML = '<div class="empty">لسه مفيش مصروفات النهاردة</div>'; return; }
+      box.innerHTML = "";
+      [...expenses].reverse().forEach(x => {
+        const voided = x.status === "voided";
+        const el = document.createElement("div");
+        el.className = "order" + (voided ? " cancelled" : "");
+        el.innerHTML = `
+          <div class="row1"><span class="tbl">${esc(x.note || "بدون ملحوظة")}</span><span class="time">${esc(String(x.ts || "").slice(11, 16))}</span></div>
+          <div class="row2">
+            <span class="total">${esc(x.amount)} ${CUR}</span>
+            ${voided ? '<span class="status-chip cancelled">ملغي</span>' : `<button class="cancel-btn" data-id="${x.id}">إلغاء المصروف</button>`}
+          </div>`;
+        if (!voided) el.querySelector(".cancel-btn").onclick = () => {
+          if (confirm("تأكيد إلغاء مصروف " + x.amount + " " + CUR + "؟")) voidExpense(x.id);
         };
         box.appendChild(el);
       });
+    }
+
+    function addExpense() {
+      const amountRaw = document.getElementById("expAmount").value;
+      const amount = Number(amountRaw);
+      if (amountRaw === "" || isNaN(amount) || amount <= 0) { alert("المبلغ لازم يكون رقم أكبر من صفر"); return; }
+      const note = document.getElementById("expNote").value.trim();
+      const btn = document.getElementById("expAddBtn"); btn.disabled = true; btn.textContent = "جاري الإضافة…";
+      const url = `${CFG.admin_webhook}?action=expense_add&amount=${encodeURIComponent(amount)}&note=${encodeURIComponent(note)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(data => {
+        if (data.error) { alert("خطأ: " + data.error); return; }
+        document.getElementById("expAmount").value = "";
+        document.getElementById("expNote").value = "";
+        loadExpenses();
+      }).catch(() => alert("تعذر الاتصال — حاول تاني"))
+        .finally(() => { btn.disabled = false; btn.textContent = "إضافة"; });
+    }
+
+    function voidExpense(id) {
+      const url = `${CFG.admin_webhook}?action=expense_void&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(() => loadExpenses())
+        .catch(() => alert("تعذر إلغاء المصروف — حاول تاني"));
     }
 
     // ---------- Menu tab: load + group the Menu sheet (this IS the full catalog -- every
@@ -425,9 +641,9 @@
     function priceLabel(it) {
       if (it.variants) {
         const label = it.variants.map(v => `${v.name} ${offerOn(v) ? v.salePrice : v.price}`).join(" · ") + " " + CUR;
-        return (offerOn(it) ? "🏷️ " : "") + label;
+        return (offerOn(it) ? "خصم " : "") + label;
       }
-      if (offerOn(it)) return `<s>${it.price}</s> ${it.salePrice} ${CUR} 🏷️`;
+      if (offerOn(it)) return `<s>${it.price}</s> ${it.salePrice} ${CUR} خصم`;
       return it.price + " " + CUR;
     }
 
@@ -460,7 +676,7 @@
           <div class="mprice">${priceLabel(it)}</div>
         </div>
         <div class="mactions">
-          <button class="moffer ${offerOn(it) ? "on" : ""}" title="عرض">🏷️</button>
+          <button class="moffer ${offerOn(it) ? "on" : ""}" title="عرض">خصم</button>
           <button class="medit" title="تعديل">✏️</button>
           <button class="mstock ${it.active ? "on" : "off"}" ${it._busy ? "disabled" : ""}>${it._busy ? "…" : (it.active ? "متوفر" : "خلصت")}</button>
         </div>`;
@@ -679,12 +895,117 @@
         .finally(() => { btn.disabled = false; btn.textContent = "إضافة"; });
     }
 
+    // ---------- Edit an existing order (fix a mistake without cancelling) ----------
+    // o.items trace back to the server's own JSON -- parsed into line items, never trusted
+    // as HTML; every input value below is set via the DOM .value property (never
+    // interpolated into innerHTML), so a malicious item name can't break out of an attribute
+    // the way string concatenation into HTML would allow.
+    // Cashier-entered order -- for a walk-in who pays at the counter instead of scanning a
+    // table's QR. Embeds the real customer ordering page (same photos/categories/variants/
+    // cart index.html already has, in its new cashier=1 mode) instead of making the cashier
+    // type item names/prices from scratch. See
+    // docs/superpowers/specs/2026-10-11-cashier-order-picker-design.md.
+    function openNewOrder() {
+      const url = `index.html?c=${encodeURIComponent(CLIENT)}&table=${encodeURIComponent("كاونتر")}&cashier=1`;
+      document.getElementById("newOrderFrame").src = url;
+      openSheet("newOrderSheet");
+    }
+
+    function openOrderEdit(o) {
+      oeOrderId = o.id;
+      document.getElementById("oeTable").value = o.table;
+      const box = document.getElementById("oeItems"); box.innerHTML = "";
+      let items;
+      try {
+        const parsed = JSON.parse(o.items);
+        items = Array.isArray(parsed) ? parsed : null;
+      } catch (e) { items = null; }
+      if (!items || !items.length) items = [{ name: "", qty: 1, price: 0 }];
+      items.forEach(it => addOeItemLine(it));
+      document.getElementById("oeTotalCur").textContent = CUR;
+      updateOeTotal();
+      openSheet("orderEditSheet");
+    }
+
+    function addOeItemLine(it) {
+      const box = document.getElementById("oeItems");
+      const row = document.createElement("div");
+      row.className = "oe-item-row";
+      row.innerHTML = `
+        <input class="oe-item-name" placeholder="اسم الصنف" />
+        <input class="oe-item-qty" type="number" inputmode="numeric" placeholder="الكمية" />
+        <input class="oe-item-price" type="number" inputmode="decimal" placeholder="السعر" />
+        <button type="button" class="oe-item-remove" aria-label="حذف">🗑️</button>`;
+      if (it) {
+        row.querySelector(".oe-item-name").value = it.name || "";
+        row.querySelector(".oe-item-qty").value = it.qty != null ? it.qty : "";
+        row.querySelector(".oe-item-price").value = it.price != null ? it.price : "";
+      }
+      row.querySelector(".oe-item-remove").onclick = () => { row.remove(); updateOeTotal(); };
+      row.querySelectorAll(".oe-item-qty, .oe-item-price").forEach(inp => inp.addEventListener("input", updateOeTotal));
+      box.appendChild(row);
+      updateOeTotal();
+    }
+
+    function oeRows() {
+      return [...document.querySelectorAll("#oeItems .oe-item-row")].map(row => ({
+        name: row.querySelector(".oe-item-name").value.trim(),
+        qty: Number(row.querySelector(".oe-item-qty").value),
+        price: Number(row.querySelector(".oe-item-price").value),
+      }));
+    }
+
+    // Total is ALWAYS computed client-side from the line items (qty×price summed), never a
+    // separately-typed field -- guarantees it can't disagree with what's listed.
+    function updateOeTotal() {
+      const total = oeRows().reduce((s, r) => s + ((isNaN(r.qty) || isNaN(r.price)) ? 0 : r.qty * r.price), 0);
+      document.getElementById("oeTotal").textContent = total;
+    }
+
+    function saveOrderEdit() {
+      const table = document.getElementById("oeTable").value.trim();
+      if (!table) { alert("اكتب رقم الترابيزة"); return; }
+      const rows = oeRows();
+      if (!rows.length) { alert("لازم يكون فيه صنف واحد على الأقل"); return; }
+      const bad = rows.some(r => !r.name || isNaN(r.qty) || r.qty <= 0 || isNaN(r.price) || r.price <= 0);
+      if (bad) { alert("تأكد إن كل صنف عنده اسم وكمية وسعر صح"); return; }
+      const total = rows.reduce((s, r) => s + r.qty * r.price, 0);
+
+      const btn = document.getElementById("oeSave"); btn.disabled = true; btn.textContent = "جاري الحفظ…";
+      const url = `${CFG.admin_webhook}?action=order_edit&id=${encodeURIComponent(oeOrderId)}`
+        + `&table=${encodeURIComponent(table)}&items=${encodeURIComponent(JSON.stringify(rows))}`
+        + `&total=${encodeURIComponent(total)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(data => {
+        if (data.error) { alert("خطأ: " + data.error); return; }
+        closeSheets();
+        refreshLive();
+      }).catch(() => alert("تعذر الاتصال — حاول تاني"))
+        .finally(() => { btn.disabled = false; btn.textContent = "حفظ"; });
+    }
+
     function openSheet(id) { document.getElementById("scrim").classList.add("show"); document.getElementById(id).classList.add("show"); }
     function closeSheets() {
       document.getElementById("scrim").classList.remove("show");
       document.getElementById("editSheet").classList.remove("show");
       document.getElementById("addSheet").classList.remove("show");
+      document.getElementById("orderEditSheet").classList.remove("show");
+      document.getElementById("newOrderSheet").classList.remove("show");
+      // Reset so reopening the cashier-order sheet always starts clean -- no stale
+      // half-built cart left over from a previous session.
+      document.getElementById("newOrderFrame").src = "about:blank";
     }
+
+    // Receives {type:"waqti_order_sent"} from the embedded customer-ordering iframe once a
+    // cashier-entered order has been sent successfully -- see openNewOrder() above. Origin-
+    // checked both directions (index.html posts to location.origin explicitly, this checks
+    // event.origin matches) so it can't be spoofed by unrelated embedded content.
+    window.addEventListener("message", (e) => {
+      if (e.origin !== location.origin) return;
+      if (e.data && e.data.type === "waqti_order_sent") {
+        closeSheets();
+        refreshLive();
+      }
+    });
   </script>
 </body>
 </html>
