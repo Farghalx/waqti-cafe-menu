@@ -361,12 +361,25 @@
     function reveal() { document.body.classList.add("ready"); }
     setTimeout(reveal, 2500); // safety net -- never leave the page permanently blank
 
-    fetch(`clients/${CLIENT}.json`).then(r => r.json())
-      .then(cfg => cfg.price_sheet_api ? applyMenuSheet(cfg) : applyPriceOverrides(cfg))
-      .then(boot).catch(() => {
+    // Two-phase: paint instantly from the bundled JSON seed (same categories/prices/photos
+    // committed to this file), THEN merge in the live Sheet's overrides (stock/price/name/
+    // offers/new items) and re-render once that arrives. The Sheet round-trip (action=menu)
+    // measured 3-7.5s live, sometimes much worse -- waiting on it before showing ANYTHING
+    // (the old behavior) is exactly why "+ طلب جديد" / a fresh QR scan felt frozen. A few
+    // seconds of showing slightly-stale data (a price the owner just changed, say) beats a
+    // guaranteed multi-second blank screen on every single load. applyMenuSheet/
+    // applyPriceOverrides already fall back to the untouched JSON cfg internally on failure,
+    // so this never leaves the page worse off than the old single-phase load.
+    function loadAndBoot() {
+      return fetch(`clients/${CLIENT}.json`).then(r => r.json()).then(cfg => {
+        boot(cfg);
+        return (cfg.price_sheet_api ? applyMenuSheet(cfg) : applyPriceOverrides(cfg)).then(boot);
+      }).catch(() => {
         document.getElementById("menu").innerHTML = '<div class="loading">تعذر تحميل القائمة.</div>';
         reveal();
       });
+    }
+    loadAndBoot();
 
     function boot(cfg) {
       CFG = cfg; CUR = cfg.currency || "ج";
