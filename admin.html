@@ -77,6 +77,11 @@
     .order .edit-btn:active { transform:scale(.96); }
     .order .status-chip { font-size:12px; font-weight:800; padding:4px 10px; border-radius:999px; }
     .status-chip.cancelled { background:#fbe5e5; color:var(--cancel); }
+    .status-chip.pending { background:#eef6f8; color:var(--blue); }
+    .order .row3 { margin-top:8px; }
+    .order .retry-btn { background:#fff3e0; border:1.5px solid #e0a030; color:#8a5a00; font-family:inherit;
+      font-weight:700; font-size:12.5px; padding:7px 12px; border-radius:10px; cursor:pointer; width:100%; }
+    .order .retry-btn:active { transform:scale(.97); }
     .empty { text-align:center; color:var(--muted); padding:60px 16px; font-weight:600; }
     .refresh-note { text-align:center; color:var(--muted); font-size:12px; padding:10px; }
 
@@ -290,6 +295,28 @@
     let state = { items: [], catOrder: [] };
     let editingId = null;
     let oeOrderId = null;
+    let liveOrders = []; // local cache of the last-fetched Orders list, for optimistic cancel (see cancelLive)
+
+    // ---------- Expenses local-first state: the rendered list always comes from this array,
+    // never straight from a fetch response -- add/void apply to it immediately (instant UI,
+    // no waiting on the Apps Script round-trip, which can run several seconds), sync to the
+    // Sheet in the background, and reconcile silently on success. An entry not yet confirmed
+    // (_pending) or that failed to sync (_failed, shows a retry button) is also persisted to
+    // localStorage so a reload before the background sync finishes doesn't lose it. ----------
+    let expenses = [];
+    function expensesStorageKey() { return "waqti_pending_expenses_" + CLIENT; }
+    function loadPendingExpensesFromStorage() {
+      try {
+        const raw = localStorage.getItem(expensesStorageKey());
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) { return []; } // private browsing / storage disabled -- just means nothing to restore
+    }
+    function savePendingExpensesToStorage() {
+      try {
+        const pending = expenses.filter(x => x._pending || x._failed);
+        localStorage.setItem(expensesStorageKey(), JSON.stringify(pending));
+      } catch (e) { /* storage blocked -- in-memory state still works for this session */ }
+    }
 
     function reveal() { document.body.classList.add("ready"); }
     setTimeout(reveal, 2500); // safety net -- never leave the page permanently blank
@@ -392,13 +419,27 @@
       const url = `${CFG.admin_webhook}?action=list&key=${encodeURIComponent(CFG.admin_key || "")}`;
       fetch(url).then(r => r.json()).then(data => {
         if (data.error) { document.getElementById("refreshNote").textContent = "خطأ: " + data.error; return; }
-        renderOrders(data.orders, data.expected_cash, cancelLive, openOrderEdit);
+        liveOrders = data.orders;
+        renderOrders(liveOrders, data.expected_cash, cancelLive, openOrderEdit);
       }).catch(() => { document.getElementById("refreshNote").textContent = "تعذر الاتصال — هيحاول تاني"; });
     }
+    function expectedCash(orders) {
+      return orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
+    }
+    // Cancels instantly in the UI (no waiting on the Apps Script round-trip, which can take
+    // several seconds) -- flips the local cache + re-renders right away, syncs to the Sheet in
+    // the background, and rolls the status back with an alert only if that sync actually fails.
+    // The next 15s poll (refreshLive) reconciles regardless, so this never drifts for long.
     function cancelLive(id) {
+      const o = liveOrders.find(x => x.id === id);
+      if (!o) return;
+      const prevStatus = o.status;
+      o.status = "cancelled";
+      renderOrders(liveOrders, expectedCash(liveOrders), cancelLive, openOrderEdit);
       const url = `${CFG.admin_webhook}?action=cancel&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
-      fetch(url).then(r => r.json()).then(() => refreshLive())
-        .catch(() => alert("تعذر إلغاء الطلب — حاول تاني"));
+      fetch(url).then(r => r.json()).then(data => {
+        if (data.error) { o.status = prevStatus; renderOrders(liveOrders, expectedCash(liveOrders), cancelLive, openOrderEdit); alert("تعذر إلغاء الطلب: " + data.error); }
+      }).catch(() => { o.status = prevStatus; renderOrders(liveOrders, expectedCash(liveOrders), cancelLive, openOrderEdit); alert("تعذر إلغاء الطلب — حاول تاني"); });
     }
 
     // ---------- History tab: per-day totals over an owner-chosen date range ----------
@@ -532,15 +573,29 @@
     }
 
     // ---------- Expenses tab (تقفيل): log a cash expense, void a mistaken entry ----------
+    // Local-first: addExpense/voidExpense mutate the `expenses` array and re-render
+    // IMMEDIATELY, never waiting on the Apps Script round-trip (observed 3-7s per call live,
+    // occasionally much worse) -- the network call happens in the background afterward. See
+    // the `expenses` state + storage helpers declared near the top of this script.
     function loadExpenses() {
+      const pending = loadPendingExpensesFromStorage();
+      if (pending.length) { expenses = pending; renderExpenses(); } // show anything unsynced from a previous visit right away, before the network even responds
       const url = `${CFG.admin_webhook}?action=expense_list&key=${encodeURIComponent(CFG.admin_key || "")}`;
       fetch(url).then(r => r.json()).then(data => {
-        if (data.error) { document.getElementById("expensesList").innerHTML = `<div class="empty">خطأ: ${esc(data.error)}</div>`; return; }
-        renderExpenses(data.expenses || [], data.total || 0);
-      }).catch(() => { document.getElementById("expensesList").innerHTML = '<div class="empty">تعذر الاتصال — حاول تاني</div>'; });
+        if (data.error) { if (!expenses.length) document.getElementById("expensesList").innerHTML = `<div class="empty">خطأ: ${esc(data.error)}</div>`; return; }
+        const server = (data.expenses || []).map(x => ({ ...x }));
+        const serverIds = new Set(server.map(x => x.id));
+        // Keep any not-yet-synced local entry the server doesn't know about yet; drop the rest
+        // (the server's copy is now authoritative for everything it has).
+        const localOnly = expenses.filter(x => (x._pending || x._failed) && !serverIds.has(x.id));
+        expenses = server.concat(localOnly);
+        renderExpenses();
+        savePendingExpensesToStorage();
+      }).catch(() => { if (!expenses.length) document.getElementById("expensesList").innerHTML = '<div class="empty">تعذر الاتصال — حاول تاني</div>'; });
     }
 
-    function renderExpenses(expenses, total) {
+    function renderExpenses() {
+      const total = expenses.filter(x => x.status !== "voided").reduce((s, x) => s + x.amount, 0);
       document.getElementById("expTotal").textContent = total + " " + CUR;
       const box = document.getElementById("expensesList");
       if (!expenses.length) { box.innerHTML = '<div class="empty">لسه مفيش مصروفات النهاردة</div>'; return; }
@@ -554,11 +609,47 @@
           <div class="row2">
             <span class="total">${esc(x.amount)} ${CUR}</span>
             ${voided ? '<span class="status-chip cancelled">ملغي</span>' : `<button class="cancel-btn" data-id="${x.id}">إلغاء المصروف</button>`}
-          </div>`;
+          </div>
+          ${x._pending ? '<div class="row3"><span class="status-chip pending">بيتزامن مع الشيت…</span></div>' : ""}
+          ${x._failed ? `<div class="row3"><button class="retry-btn" data-id="${x.id}">⚠️ لم يتزامن — إعادة المحاولة</button></div>` : ""}`;
         if (!voided) el.querySelector(".cancel-btn").onclick = () => {
           if (confirm("تأكيد إلغاء مصروف " + x.amount + " " + CUR + "؟")) voidExpense(x.id);
         };
+        if (x._failed) el.querySelector(".retry-btn").onclick = () => retryExpense(x.id);
         box.appendChild(el);
+      });
+    }
+
+    // Sends the add for one local (not-yet-synced) entry in the background. Shared by
+    // addExpense (first attempt) and retryExpense (after a failure) so both reconcile the
+    // same way: success swaps the temp id for the real expense_id; failure marks it _failed
+    // so renderExpenses shows a retry button instead of silently dropping it.
+    function syncExpenseAdd(localId) {
+      const e = expenses.find(x => x.id === localId);
+      if (!e) return;
+      const url = `${CFG.admin_webhook}?action=expense_add&amount=${encodeURIComponent(e.amount)}&note=${encodeURIComponent(e.note)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(data => {
+        const cur = expenses.find(x => x.id === localId);
+        if (!cur) return;
+        if (data.error) {
+          // If it was voided while still mid-sync, there's nothing on the server to void --
+          // just drop it instead of surfacing a confusing "retry" for an entry the owner
+          // already said she doesn't want.
+          if (cur._voidPending) { expenses = expenses.filter(x => x.id !== localId); }
+          else { cur._pending = false; cur._failed = true; }
+          renderExpenses(); savePendingExpensesToStorage();
+          return;
+        }
+        cur.id = data.expense_id; delete cur._pending;
+        const needsVoid = cur._voidPending; delete cur._voidPending;
+        renderExpenses(); savePendingExpensesToStorage();
+        if (needsVoid) voidExpense(cur.id); // now that it has a real id, send the void the owner already requested
+      }).catch(() => {
+        const cur = expenses.find(x => x.id === localId);
+        if (!cur) return;
+        if (cur._voidPending) { expenses = expenses.filter(x => x.id !== localId); }
+        else { cur._pending = false; cur._failed = true; }
+        renderExpenses(); savePendingExpensesToStorage();
       });
     }
 
@@ -567,21 +658,42 @@
       const amount = Number(amountRaw);
       if (amountRaw === "" || isNaN(amount) || amount <= 0) { alert("المبلغ لازم يكون رقم أكبر من صفر"); return; }
       const note = document.getElementById("expNote").value.trim();
-      const btn = document.getElementById("expAddBtn"); btn.disabled = true; btn.textContent = "جاري الإضافة…";
-      const url = `${CFG.admin_webhook}?action=expense_add&amount=${encodeURIComponent(amount)}&note=${encodeURIComponent(note)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
-      fetch(url).then(r => r.json()).then(data => {
-        if (data.error) { alert("خطأ: " + data.error); return; }
-        document.getElementById("expAmount").value = "";
-        document.getElementById("expNote").value = "";
-        loadExpenses();
-      }).catch(() => alert("تعذر الاتصال — حاول تاني"))
-        .finally(() => { btn.disabled = false; btn.textContent = "إضافة"; });
+      document.getElementById("expAmount").value = "";
+      document.getElementById("expNote").value = "";
+
+      const localId = "local_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+      const now = new Date();
+      const pad = n => String(n).padStart(2, "0");
+      const ts = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+      expenses.push({ id: localId, ts, amount, note, status: "active", _pending: true });
+      renderExpenses();
+      savePendingExpensesToStorage();
+      syncExpenseAdd(localId);
     }
 
+    function retryExpense(id) {
+      const e = expenses.find(x => x.id === id);
+      if (!e || !e._failed) return;
+      e._failed = false; e._pending = true;
+      renderExpenses(); savePendingExpensesToStorage();
+      syncExpenseAdd(id);
+    }
+
+    // Marks voided instantly in the UI; syncs to the Sheet in the background, rolling back
+    // with an alert only if that sync actually fails. If the entry is still mid-add (never
+    // got a real id yet), the actual void call is deferred until syncExpenseAdd resolves.
     function voidExpense(id) {
+      const e = expenses.find(x => x.id === id);
+      if (!e) return;
+      const prevStatus = e.status;
+      e.status = "voided";
+      renderExpenses();
+      savePendingExpensesToStorage();
+      if (e._pending) { e._voidPending = true; return; }
       const url = `${CFG.admin_webhook}?action=expense_void&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
-      fetch(url).then(r => r.json()).then(() => loadExpenses())
-        .catch(() => alert("تعذر إلغاء المصروف — حاول تاني"));
+      fetch(url).then(r => r.json()).then(data => {
+        if (data.error) { e.status = prevStatus; renderExpenses(); alert("تعذر إلغاء المصروف: " + data.error); }
+      }).catch(() => { e.status = prevStatus; renderExpenses(); alert("تعذر إلغاء المصروف — حاول تاني"); });
     }
 
     // ---------- Menu tab: load + group the Menu sheet (this IS the full catalog -- every
@@ -678,7 +790,7 @@
         <div class="mactions">
           <button class="moffer ${offerOn(it) ? "on" : ""}" title="عرض">خصم</button>
           <button class="medit" title="تعديل">✏️</button>
-          <button class="mstock ${it.active ? "on" : "off"}" ${it._busy ? "disabled" : ""}>${it._busy ? "…" : (it.active ? "متوفر" : "خلصت")}</button>
+          <button class="mstock ${it.active ? "on" : "off"}">${it.active ? "متوفر" : "خلصت"}</button>
         </div>`;
       card.querySelector(".moffer").onclick = () => toggleOffer(it.id);
       card.querySelector(".medit").onclick = () => openEdit(it.id);
@@ -689,27 +801,19 @@
     // Tapping the offer pill: if no discount price is configured yet, open the edit sheet
     // so she can set one (saving it there turns the offer on automatically -- see saveEdit).
     // If a price IS already configured, this is a plain on/off toggle, same pattern as stock.
+    // Both toggles flip the local state and re-render INSTANTLY (no waiting on the Apps
+    // Script round-trip, which can take several seconds) -- syncMenuRow sends the write in
+    // the background. No rollback-on-failure here (unlike Expenses/order-cancel): just an
+    // alert, since a wrong card state is immediately obvious and a second tap self-corrects.
     function toggleOffer(id) {
       const it = state.items.find(i => i.id === id);
-      if (!it || it._busy) return;
+      if (!it) return;
       if (!offerConfigured(it)) { openEdit(id); return; }
       const newOn = !offerOn(it);
-      it._busy = true; renderMenu();
-      const writes = rowsForItem(it).map(r => {
-        const sale = it.variants ? it.variants.find(v => v.name === r.variant).salePrice : it.salePrice;
-        return menuSet({
-          item_id: id, category: it.category, name_ar: it.name_ar,
-          variant: r.variant, price_egp: r.price, active: String(it.active),
-          sale_price_egp: sale, on_offer: String(newOn),
-        });
-      });
-      Promise.all(writes).then(results => {
-        if (results.every(r => r && r.ok)) {
-          if (it.variants) it.variants.forEach(v => { v.onOffer = newOn; });
-          else it.onOffer = newOn;
-        } else alert("حصل خطأ — حاول تاني");
-      }).catch(() => alert("تعذر الاتصال — حاول تاني"))
-        .finally(() => { it._busy = false; renderMenu(); });
+      if (it.variants) it.variants.forEach(v => { v.onOffer = newOn; });
+      else it.onOffer = newOn;
+      renderMenu();
+      syncMenuRow(it);
     }
 
     function rowsForItem(it) {
@@ -724,27 +828,37 @@
       return fetch(`${CFG.price_sheet_api}?${qs.toString()}`).then(r => r.json());
     }
 
-    function toggleStock(id) {
-      const it = state.items.find(i => i.id === id);
-      if (!it || it._busy) return;
-      const newActive = !it.active;
-      it._busy = true; renderMenu();
-      // menuSet upserts the WHOLE row server-side, not a partial patch -- any configured
-      // offer (sale_price_egp/on_offer) must be resent here too, or toggling stock would
-      // silently wipe it.
+    // Chains through it._syncChain so rapid repeated taps on the SAME item serialize instead
+    // of racing (two concurrent menuSet writes could otherwise land on the real Sheet out of
+    // order and leave it on the stale value). Each queued write reads it.active/onOffer at
+    // the time it actually RUNS, not when it was queued, so it always sends the latest state.
+    function syncMenuRow(it) {
+      it._syncChain = (it._syncChain || Promise.resolve()).then(() => writeMenuRow(it));
+      return it._syncChain;
+    }
+
+    function writeMenuRow(it) {
+      // menuSet upserts the WHOLE row server-side, not a partial patch -- stock + offer
+      // fields must always be resent together, or one toggle would silently wipe the other.
       const writes = rowsForItem(it).map(r => {
         const v = it.variants ? it.variants.find(x => x.name === r.variant) : it;
         return menuSet({
-          item_id: id, category: it.category, name_ar: it.name_ar,
-          variant: r.variant, price_egp: r.price, active: String(newActive),
+          item_id: it.id, category: it.category, name_ar: it.name_ar,
+          variant: r.variant, price_egp: r.price, active: String(it.active),
           sale_price_egp: v.salePrice == null ? '' : v.salePrice, on_offer: String(!!v.onOffer),
         });
       });
-      Promise.all(writes).then(results => {
-        if (results.every(r => r && r.ok)) it.active = newActive;
-        else alert("حصل خطأ — حاول تاني");
-      }).catch(() => alert("تعذر الاتصال — حاول تاني"))
-        .finally(() => { it._busy = false; renderMenu(); });
+      return Promise.all(writes).then(results => {
+        if (!results.every(r => r && r.ok)) alert("حصل خطأ — حاول تاني");
+      }).catch(() => alert("تعذر الاتصال — حاول تاني"));
+    }
+
+    function toggleStock(id) {
+      const it = state.items.find(i => i.id === id);
+      if (!it) return;
+      it.active = !it.active;
+      renderMenu();
+      syncMenuRow(it);
     }
 
     // ---------- Edit existing item (name + price + optional discount price -- not variant
