@@ -317,10 +317,30 @@
     let liveOrders = []; // local cache of the last-fetched Orders list, for optimistic cancel (see cancelLive)
 
     // ---------- Day-nav helpers (Expenses + History: ◀ السابق / التالي ▶) ----------
-    function todayStr() {
+    // "Today" means Cairo's business day (apps_script_v2.gs: DAY_START_HOUR=6,
+    // TZ=Africa/Cairo) -- never the viewing device's own calendar date. Ahmed's phone is
+    // usually on Malaysia time (UTC+8, several hours ahead of Cairo), so during Cairo's
+    // midnight-6AM rollover window the device's date has already advanced to tomorrow while
+    // Cairo's business day hasn't -- a device-clock "today" is wrong for hours every single
+    // day. Fix: ask the backend what day it is (action=today is public, no key, already
+    // returns bizDateHuman server-side) once on boot and anchor every "today" on that.
+    let serverTodayAnchor = null;
+    function deviceTodayStr() {
       const now = new Date();
       const pad = n => String(n).padStart(2, "0");
       return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    }
+    function todayStr() {
+      return serverTodayAnchor || deviceTodayStr();
+    }
+    // Demo mode has no backend to ask (and no real business day to get wrong), so it just
+    // keeps the device-clock fallback. A failed fetch leaves serverTodayAnchor unset for the
+    // same reason -- fail soft, not blank. Fire-and-forget: never blocks reveal() on this.
+    function fetchServerTodayAnchor() {
+      if (!LIVE) return;
+      fetch(`${CFG.admin_webhook}?action=today`).then(r => r.json()).then(data => {
+        if (data && data.date) serverTodayAnchor = data.date;
+      }).catch(() => {});
     }
     function shiftDate(dateStr, days) {
       const [y, m, d] = dateStr.split("-").map(Number);
@@ -378,6 +398,7 @@
       document.getElementById("pinTitle").textContent = cleanName + " — لوحة الإدارة";
       document.title = "لوحة الإدارة — " + cleanName;
       LIVE = !!cfg.admin_webhook;
+      fetchServerTodayAnchor();
       hasMenu = !!cfg.price_sheet_api;
       // Gated on a per-client features flag, not just LIVE -- admin.html/apps_script_v2.gs
       // are shared across every client, and most other clients' Sheets don't have the
@@ -503,18 +524,29 @@
       label.textContent = isSingleDay ? (from === todayStr() ? "اليوم" : from) : "فترة مختارة";
       document.getElementById("histNextDayBtn").disabled = isSingleDay && from === todayStr(); // no point browsing into the future
     }
+    // Keyed by from+to so navigating back to an already-seen range (very common with the
+    // ◀/▶ day-nav) paints instantly from the last successful response, before the Apps
+    // Script round-trip (same several-second latency as Expenses/stock toggle) even fires --
+    // then silently swaps in the fresh response once it lands. In-memory only (no
+    // localStorage) -- unlike the menu, a stale history range is cheap to re-fetch and not
+    // worth persisting across a reload.
+    const historyCache = {};
+    function historyCacheKey(from, to) { return from + "|" + to; }
     function loadHistory() {
       const from = document.getElementById("histFrom").value;
       const to = document.getElementById("histTo").value;
       updateHistDayLabel();
       const box = document.getElementById("historyList");
       if (!from || !to) { box.innerHTML = '<div class="empty">اختار تاريخ البداية والنهاية</div>'; return; }
-      box.innerHTML = '<div class="loading">جاري التحميل…</div>';
+      const cached = historyCache[historyCacheKey(from, to)];
+      if (cached) renderHistory(cached);
+      else box.innerHTML = '<div class="loading">جاري التحميل…</div>';
       const url = `${CFG.admin_webhook}?action=history&from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
       fetch(url).then(r => r.json()).then(data => {
-        if (data.error) { box.innerHTML = `<div class="empty">خطأ: ${esc(data.error)}</div>`; return; }
+        if (data.error) { if (!cached) box.innerHTML = `<div class="empty">خطأ: ${esc(data.error)}</div>`; return; }
+        historyCache[historyCacheKey(from, to)] = data.days || [];
         renderHistory(data.days || []);
-      }).catch(() => { box.innerHTML = '<div class="empty">تعذر الاتصال — حاول تاني</div>'; });
+      }).catch(() => { if (!cached) box.innerHTML = '<div class="empty">تعذر الاتصال — حاول تاني</div>'; });
     }
     function renderHistory(days) {
       const box = document.getElementById("historyList");
@@ -819,12 +851,33 @@
     // ---------- Menu tab: load + group the Menu sheet (this IS the full catalog -- every
     // item was seeded into it already, so unlike index.html's merge there's no JSON fallback
     // needed here for display purposes) ----------
+    // Local-first, same latency-hiding pattern as Expenses/stock toggle: paints the last
+    // successful menu INSTANTLY from cache (memory, falling back to localStorage so it
+    // survives a reload) before the Apps Script round-trip even fires, then silently swaps
+    // in the fresh response once it lands.
+    let menuRowsCache = null;
+    function menuCacheStorageKey() { return "waqti_menu_cache_" + CLIENT; }
+    function loadMenuRowsFromStorage() {
+      try {
+        const raw = localStorage.getItem(menuCacheStorageKey());
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; } // private browsing / storage disabled -- just means nothing to restore
+    }
+    function saveMenuRowsToStorage(rows) {
+      try { localStorage.setItem(menuCacheStorageKey(), JSON.stringify(rows)); }
+      catch (e) { /* storage blocked -- in-memory cache still works for this session */ }
+    }
     function loadMenu() {
+      if (!menuRowsCache) menuRowsCache = loadMenuRowsFromStorage();
+      if (menuRowsCache) { state = groupRows(menuRowsCache); renderMenu(); }
       fetch(`${CFG.price_sheet_api}?action=menu`).then(r => r.json()).then(data => {
-        state = groupRows((data && data.rows) || []);
+        const rows = (data && data.rows) || [];
+        menuRowsCache = rows;
+        saveMenuRowsToStorage(rows);
+        state = groupRows(rows);
         renderMenu();
       }).catch(() => {
-        document.getElementById("menuList").innerHTML = '<div class="loading">تعذر تحميل المنيو — اقفل الصفحة وافتحها تاني</div>';
+        if (!menuRowsCache) document.getElementById("menuList").innerHTML = '<div class="loading">تعذر تحميل المنيو — اقفل الصفحة وافتحها تاني</div>';
       });
     }
 
