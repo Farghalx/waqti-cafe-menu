@@ -38,6 +38,16 @@ from PIL import Image, ImageDraw, ImageFont
 import arabic_reshaper
 from bidi.algorithm import get_display
 
+# Windows' console/redirected-file encoding defaults to the system codepage (e.g. cp1252),
+# not UTF-8 -- any print() of Arabic text (table labels like "كاونتر" for cashier-entered
+# orders, item names, etc.) raises UnicodeEncodeError on that default. Confirmed live on the
+# Squeeze cafe PC, 2026-10-13: every cashier-entered order ("+ طلب جديد", table="كاونتر")
+# crashed on its own log line BEFORE print_order() ran, so it never actually printed and
+# just retried (and failed) forever, every 2s, silently. Force UTF-8 so logging Arabic text
+# can never crash the print path that matters.
+sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 # ---------------- Config ----------------
 PRINTER_NAME = "cashier"   # exact Windows printer queue name (confirmed via win32print.EnumPrinters, 2026-10-05)
 
