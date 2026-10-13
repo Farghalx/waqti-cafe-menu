@@ -48,6 +48,9 @@
     .stat { flex:1; background:var(--card); border-radius:16px; padding:14px; box-shadow:var(--shadow); text-align:center; }
     .stat b { display:block; font-size:22px; color:var(--blue); }
     .stat small { color:var(--muted); font-size:12px; font-weight:700; }
+    /* Item name + count can run long (unlike the plain numbers in the other stat boxes) --
+       smaller font + wrap instead of overflowing the narrow mobile card. */
+    .stat b#statBestSeller { font-size:14px; white-space:normal; line-height:1.3; }
     .listwrap { padding:0 16px; }
 
     /* ---- History tab ---- */
@@ -75,6 +78,9 @@
     .order .edit-btn { background:#fff; border:1.5px solid var(--blue); color:var(--blue); font-family:inherit;
       font-weight:700; font-size:13px; padding:7px 14px; border-radius:10px; cursor:pointer; }
     .order .edit-btn:active { transform:scale(.96); }
+    .order .done-btn { background:var(--ok); border:1.5px solid var(--ok); color:#fff; font-family:inherit;
+      font-weight:700; font-size:13px; padding:7px 14px; border-radius:10px; cursor:pointer; }
+    .order .done-btn:active { transform:scale(.96); }
     .order .status-chip { font-size:12px; font-weight:800; padding:4px 10px; border-radius:999px; }
     .status-chip.cancelled { background:#fbe5e5; color:var(--cancel); }
     .status-chip.pending { background:#eef6f8; color:var(--blue); }
@@ -205,7 +211,7 @@
     <div id="ordersSection">
       <div class="stats">
         <div class="stat"><b id="statCount">0</b><small>عدد الطلبات</small></div>
-        <div class="stat"><b id="statTotal">0</b><small>الإجمالي المتوقع</small></div>
+        <div class="stat"><b id="statBestSeller">—</b><small>الأكثر مبيعاً</small></div>
       </div>
       <div class="listwrap" id="ordersList"></div>
       <div class="refresh-note" id="refreshNote"></div>
@@ -315,6 +321,7 @@
     let editingId = null;
     let oeOrderId = null;
     let liveOrders = []; // local cache of the last-fetched Orders list, for optimistic cancel (see cancelLive)
+    let knownOrderIds = null; // order ids seen as of the last refreshLive() poll; null until the first poll lands, so the sound never fires for orders already there on page load
 
     // ---------- Day-nav helpers (Expenses + History: ◀ السابق / التالي ▶) ----------
     // "Today" means Cairo's business day (apps_script_v2.gs: DAY_START_HOUR=6,
@@ -473,16 +480,33 @@
     }
 
     // ---------- Orders tab: live mode (real Apps Script) ----------
+    // Short beep via the Web Audio API -- no audio file to host, and it works even if the
+    // tab has no speakers focus/autoplay issues, since by the time refreshLive() ever runs
+    // the owner has already interacted with the page once (PIN entry), which satisfies
+    // browser autoplay policy for starting an AudioContext.
+    function playNewOrderSound() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.type = "sine"; osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+        osc.start(); osc.stop(ctx.currentTime + 0.4);
+      } catch (e) { /* audio blocked -- order still shows up visually either way */ }
+    }
     function refreshLive() {
       const url = `${CFG.admin_webhook}?action=list&key=${encodeURIComponent(CFG.admin_key || "")}`;
       fetch(url).then(r => r.json()).then(data => {
         if (data.error) { document.getElementById("refreshNote").textContent = "خطأ: " + data.error; return; }
         liveOrders = data.orders;
-        renderOrders(liveOrders, data.expected_cash, cancelLive, openOrderEdit);
+        // knownOrderIds starts null (set only here) so the very first poll after opening the
+        // dashboard never plays a sound for every order already sitting there.
+        if (knownOrderIds && liveOrders.some(o => !knownOrderIds.has(o.id))) playNewOrderSound();
+        knownOrderIds = new Set(liveOrders.map(o => o.id));
+        renderOrders(liveOrders, cancelLive, openOrderEdit, doneLive);
       }).catch(() => { document.getElementById("refreshNote").textContent = "تعذر الاتصال — هيحاول تاني"; });
-    }
-    function expectedCash(orders) {
-      return orders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
     }
     // Cancels instantly in the UI (no waiting on the Apps Script round-trip, which can take
     // several seconds) -- flips the local cache + re-renders right away, syncs to the Sheet in
@@ -493,11 +517,26 @@
       if (!o) return;
       const prevStatus = o.status;
       o.status = "cancelled";
-      renderOrders(liveOrders, expectedCash(liveOrders), cancelLive, openOrderEdit);
+      renderOrders(liveOrders, cancelLive, openOrderEdit, doneLive);
       const url = `${CFG.admin_webhook}?action=cancel&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
       fetch(url).then(r => r.json()).then(data => {
-        if (data.error) { o.status = prevStatus; renderOrders(liveOrders, expectedCash(liveOrders), cancelLive, openOrderEdit); alert("تعذر إلغاء الطلب: " + data.error); }
-      }).catch(() => { o.status = prevStatus; renderOrders(liveOrders, expectedCash(liveOrders), cancelLive, openOrderEdit); alert("تعذر إلغاء الطلب — حاول تاني"); });
+        if (data.error) { o.status = prevStatus; renderOrders(liveOrders, cancelLive, openOrderEdit, doneLive); alert("تعذر إلغاء الطلب: " + data.error); }
+      }).catch(() => { o.status = prevStatus; renderOrders(liveOrders, cancelLive, openOrderEdit, doneLive); alert("تعذر إلغاء الطلب — حاول تاني"); });
+    }
+    // Marks an order served/fulfilled instantly, same local-first pattern as cancel -- but no
+    // confirm() dialog, since this is a routine action tapped many times a shift, not an
+    // irreversible "this sale didn't happen" decision. Once done, renderOrders drops it from
+    // the working list entirely (see renderOrders below) instead of greying it out like cancel.
+    function doneLive(id) {
+      const o = liveOrders.find(x => x.id === id);
+      if (!o) return;
+      const prevStatus = o.status;
+      o.status = "done";
+      renderOrders(liveOrders, cancelLive, openOrderEdit, doneLive);
+      const url = `${CFG.admin_webhook}?action=done&id=${encodeURIComponent(id)}&key=${encodeURIComponent(CFG.admin_key || "")}`;
+      fetch(url).then(r => r.json()).then(data => {
+        if (data.error) { o.status = prevStatus; renderOrders(liveOrders, cancelLive, openOrderEdit, doneLive); alert("تعذر تحديد الطلب كمنتهي: " + data.error); }
+      }).catch(() => { o.status = prevStatus; renderOrders(liveOrders, cancelLive, openOrderEdit, doneLive); alert("تعذر الاتصال — حاول تاني"); });
     }
 
     // ---------- History tab: per-day totals over an owner-chosen date range ----------
@@ -598,10 +637,13 @@
       }));
     }
     function renderMock() {
-      const total = mockOrders.filter(o => o.status !== "cancelled").reduce((s, o) => s + o.total, 0);
-      renderOrders(mockOrders, total, (id) => {
+      renderOrders(mockOrders, (id) => {
         const o = mockOrders.find(x => x.id === id);
         if (o) o.status = "cancelled";
+        renderMock();
+      }, null, (id) => {
+        const o = mockOrders.find(x => x.id === id);
+        if (o) o.status = "done";
         renderMock();
       });
     }
@@ -617,26 +659,52 @@
     // Orders written since the 2026-10-10 receipts overhaul store `items` as a JSON array
     // (name/qty/price per line) instead of a flattened display string -- lets the owner see
     // a price per line here too, same as the printed cashier copy. Orders from before that
-    // (still sitting in the real Sheet from the pilot period) are a plain string -- fall
-    // back to showing that as-is rather than crashing on JSON.parse.
-    function itemsLabel(raw) {
+    // (still sitting in the real Sheet from the pilot period) are a plain string -- returns
+    // null so callers (itemsLabel, bestSellerLabel) each decide their own fallback.
+    function parseOrderItems(raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          return parsed.map(i => `${esc(i.qty)}× ${esc(i.name)} — ${esc(i.price * i.qty)} ${CUR}`).join("<br>");
-        }
-      } catch (e) {}
+        return Array.isArray(parsed) ? parsed : null;
+      } catch (e) { return null; }
+    }
+    function itemsLabel(raw) {
+      const items = parseOrderItems(raw);
+      if (items) return items.map(i => `${esc(i.qty)}× ${esc(i.name)} — ${esc(i.price * i.qty)} ${CUR}`).join("<br>");
       return esc(raw); // legacy plain-string order, pre-dating the JSON format
     }
 
-    function renderOrders(orders, total, onCancel, onEdit) {
-      const activeCount = orders.filter(o => o.status !== "cancelled").length;
+    // Best-selling item across every REAL sale fetched this session (new + done -- cancelled
+    // never happened, excluded). Legacy plain-string orders can't be itemized, same limitation
+    // itemsLabel already has -- just skipped here, they still count toward عدد الطلبات.
+    function bestSellerLabel(orders) {
+      const qtyByName = {};
+      orders.forEach(o => {
+        if (o.status === "cancelled") return;
+        const items = parseOrderItems(o.items);
+        if (!items) return;
+        items.forEach(i => { qtyByName[i.name] = (qtyByName[i.name] || 0) + (Number(i.qty) || 0); });
+      });
+      let bestName = null, bestQty = 0;
+      Object.keys(qtyByName).forEach(name => { if (qtyByName[name] > bestQty) { bestQty = qtyByName[name]; bestName = name; } });
+      return bestName ? `${bestName} (${bestQty})` : "—";
+    }
+
+    function renderOrders(orders, onCancel, onEdit, onDone) {
+      // 'done' orders disappear from the working list entirely (not just greyed out like
+      // cancelled) -- the point is staff only see what's still pending.
+      const visibleOrders = orders.filter(o => o.status !== "done");
+      const activeCount = visibleOrders.filter(o => o.status !== "cancelled").length;
       document.getElementById("statCount").textContent = activeCount;
-      document.getElementById("statTotal").textContent = total + " " + CUR;
+      document.getElementById("statBestSeller").textContent = bestSellerLabel(orders); // from every real sale, not just what's still visible
       const box = document.getElementById("ordersList");
-      if (!orders.length) { box.innerHTML = '<div class="empty">لسه مفيش طلبات النهاردة</div>'; return; }
+      if (!visibleOrders.length) {
+        box.innerHTML = orders.length
+          ? '<div class="empty">كل الطلبات خلصت ✓</div>'
+          : '<div class="empty">لسه مفيش طلبات النهاردة</div>';
+        return;
+      }
       box.innerHTML = "";
-      [...orders].reverse().forEach(o => {
+      [...visibleOrders].reverse().forEach(o => {
         const cancelled = o.status === "cancelled";
         const el = document.createElement("div");
         el.className = "order" + (cancelled ? " cancelled" : "");
@@ -648,6 +716,7 @@
             ${cancelled ? '<span class="status-chip cancelled">ملغي</span>' : `
               <div class="order-actions">
                 ${onEdit ? '<button class="edit-btn">✏️ تعديل</button>' : ''}
+                ${onDone ? '<button class="done-btn" data-id="' + o.id + '">تم ✓</button>' : ''}
                 <button class="cancel-btn" data-id="${o.id}">إلغاء الطلب</button>
               </div>`}
           </div>`;
@@ -656,6 +725,7 @@
             if (confirm("تأكيد إلغاء طلب ترابيزة " + o.table + "؟")) onCancel(o.id);
           };
           if (onEdit) el.querySelector(".edit-btn").onclick = () => onEdit(o);
+          if (onDone) el.querySelector(".done-btn").onclick = () => onDone(o.id);
         }
         box.appendChild(el);
       });

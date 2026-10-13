@@ -515,9 +515,13 @@ def main():
             # is always insertion-order for the business day) -- a stable, speakable "order
             # N" that resets every business day, independent of which orders get printed in
             # which batch or cancelled along the way.
+            # 'done' (marked served/fulfilled from the admin dashboard) is excluded the same
+            # as 'cancelled' here as a safety net -- in practice an order is always already
+            # printed by the time staff mark it done, but this guarantees one never gets
+            # printed for the first time AFTER it's already been marked complete.
             new_orders = [
                 (i, o) for i, o in enumerate(orders, start=1)
-                if o["id"] not in printed and o["status"] != "cancelled"
+                if o["id"] not in printed and o["status"] not in ("cancelled", "done")
             ]
             for order_number, order in new_orders:
                 print(f"Printing order {order['id']} — table {order['table']} (#{order_number})")

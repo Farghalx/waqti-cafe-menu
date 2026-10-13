@@ -233,6 +233,21 @@ function doGet(e) {
     return json({ error: 'not_found' });
   }
 
+  // 'done' means served/fulfilled, NOT cancelled -- it's still a real sale (list's
+  // expected_cash, history, and تقفيل reports all count it same as 'new'; only the admin
+  // dashboard's live working list hides it so staff only see what's still pending).
+  if (action === 'done') {
+    if (e.parameter.key !== ADMIN_KEY) return json({ error: 'unauthorized' });
+    var id = e.parameter.id;
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][6]).trim() === String(id).trim()) {
+        sh.getRange(tail.startRow + i, 5).setValue('done'); // column E = status
+        return json({ ok: true });
+      }
+    }
+    return json({ error: 'not_found' });
+  }
+
   if (action === 'order_edit') return orderEdit_(sh, tail, e);
 
   return json({ error: 'unknown_action' });
